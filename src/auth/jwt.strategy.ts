@@ -1,0 +1,19 @@
+import { Injectable } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+
+@Injectable()
+export class JwtStrategy extends PassportStrategy(Strategy) {
+  constructor() {
+    super({
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: false,
+      secretOrKey: 'SECRET_KEY', // نفس المفتاح اللي في UserModule
+    });
+  }
+
+  async validate(payload: any) {
+    // هنا ترجع بيانات المستخدم بعد التحقق من JWT
+    return { id: payload.sub, email: payload.email, role: payload.role };
+  }
+}
