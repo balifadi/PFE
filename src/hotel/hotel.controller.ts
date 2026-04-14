@@ -1,91 +1,100 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Delete,
+  Put,
+  ParseIntPipe,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
+
 import { HotelService } from './hotel.service';
-import { Hotel } from '../entities/hotel.entity';
-import { ApiTags, ApiParam, ApiBody, ApiResponse } from '@nestjs/swagger';
+import { CreateHotelDto } from './dto/create-hotel.dto';
+import { UpdateHotelDto } from './dto/update-hotel.dto';
+
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiBody,
+  ApiParam,
+  ApiResponse
+} from '@nestjs/swagger';
 
 @ApiTags('Hotels')
 @Controller('hotels')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth()
 export class HotelController {
+
   constructor(private readonly hotelService: HotelService) {}
 
-  // ===============================
-  // ajouter hotel
-  // ===============================
-  @Post(':clientId')
-  @ApiParam({ name: 'clientId', type: Number, example: 1 })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        nom: { type: 'string', example: 'Hotel Djerba Palace' },
-        ville: { type: 'string', example: 'Djerba' },
-        nb_Etoiles: { type: 'number', example: 5 },
-        telephone: { type: 'string', example: '22123456' },
-        imagePath: { type: 'string', example: 'hotel.jpg' },
-        latitude: { type: 'number', example: 33.8 },
-        longitude: { type: 'number', example: 10.8 },
-        adminId: { type: 'number', example: 1 }
-      },
-      required: ['nom', 'ville', 'nb_Etoiles', 'telephone', 'adminId']
-    }
-  })
-  @ApiResponse({ status: 201, description: 'Hotel créé avec succès' })
-  @ApiResponse({ status: 400, description: 'Erreur' })
-  create(@Body() hotel: any, @Param('clientId', ParseIntPipe) clientId: number) {
-    return this.hotelService.create(hotel, clientId);
+  // ===== CREATE =====
+  @Post()
+  @Roles('admin')
+  @ApiOperation({ summary: 'Créer un hôtel' })
+  @ApiBody({ type: CreateHotelDto })
+  @ApiResponse({ status: 201, description: 'Hôtel créé avec succès' })
+  create(@Body() dto: CreateHotelDto, @Request() req: any) {
+    return this.hotelService.create(dto, req.user.iduser);
   }
 
-  // ===============================
-  // afficher tous les hotels
-  // ===============================
+  // ===== GET ALL =====
   @Get()
+  @Roles('admin', 'client', 'hotel-manager')
+  @ApiOperation({ summary: 'Lister tous les hôtels' })
   @ApiResponse({ status: 200, description: 'Liste des hôtels' })
-  findAll() {
-    return this.hotelService.findAll();
+  findAll(@Request() req: any) {
+    return this.hotelService.findAll(req.user.iduser, req.user.role);
   }
 
-  // ===============================
-  // afficher hotel par id
-  // ===============================
+
+  // ===== LOCALISATION PUBLIC =====
+  @Get('localisation-public')
+  @ApiOperation({ summary: 'Localisation des hôtels (public)' })
+  @ApiResponse({ status: 200, description: 'Coordonnées publiques des hôtels' })
+  getLocalisationPublic() {
+    return this.hotelService.getLocalisationPublic();
+  }
+
+
+  // ===== GET ONE =====
   @Get(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Hotel trouvé' })
-  @ApiResponse({ status: 404, description: 'Hotel non trouvé' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.hotelService.findOne(id);
+  @Roles('admin', 'client', 'hotel-manager')
+  @ApiOperation({ summary: 'Afficher un hôtel' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiResponse({ status: 200, description: 'Détails de l’hôtel' })
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.hotelService.findOneByUser(id, req.user.iduser, req.user.role);
   }
 
-  // ===============================
-  // modifier hotel
-  // ===============================
+  // ===== UPDATE =====
   @Put(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        nom: { type: 'string', example: 'Hotel Djerba Palace' },
-        ville: { type: 'string', example: 'Djerba' },
-        nb_Etoiles: { type: 'number', example: 5 },
-        telephone: { type: 'string', example: '22123456' },
-        imagePath: { type: 'string', example: 'hotel.jpg' },
-        latitude: { type: 'number', example: 33.8 },
-        longitude: { type: 'number', example: 10.8 }
-      }
-    }
-  })
-  @ApiResponse({ status: 200, description: 'Hotel mis à jour' })
-  update(@Param('id', ParseIntPipe) id: number, @Body() hotel: Partial<Hotel>) {
-    return this.hotelService.update(id, hotel);
+  @Roles('admin')
+  @ApiOperation({ summary: 'Modifier un hôtel' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: UpdateHotelDto })
+  @ApiResponse({ status: 200, description: 'Hôtel mis à jour' })
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateHotelDto) {
+    return this.hotelService.update(id, dto);
   }
 
-  // ===============================
-  // supprimer hotel
-  // ===============================
+  // ===== DELETE =====
   @Delete(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Hotel supprimé' })
+  @Roles('admin')
+  @ApiOperation({ summary: 'Supprimer un hôtel' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiResponse({ status: 200, description: 'Hôtel supprimé' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.hotelService.remove(id);
   }
+
+  
 }

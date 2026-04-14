@@ -19,9 +19,6 @@ export class Reservation {
   @Column()
   statut: string;
 
-  @Column({ type: 'float', default: 0 })
-  montant_reservation: number;
-
   @ManyToOne(() => Client, (client) => client.reservations)
   client: Client;
 

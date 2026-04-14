@@ -1,56 +1,58 @@
-import { Controller, Get, Post, Body, Param, Delete, Patch, ParseIntPipe } from '@nestjs/common';
-import { ReservationService } from './reservation.service';
-import { Reservation } from '../entities/reservation.entity';
 import {
-  ApiTags,
-  ApiParam,
-  ApiBody,
-  ApiResponse,
+  Controller, Get, Post, Patch, Delete,
+  Body, Param, ParseIntPipe, UseGuards, Request
+} from '@nestjs/common';
+
+import { ReservationService } from './reservation.service';
+import { CreateReservationDto } from './dto/create-reservation.dto';
+import { UpdateReservationDto } from './dto/update-reservation.dto';
+
+import {
+  ApiTags, ApiResponse, ApiBearerAuth,
+  ApiOperation, ApiParam, ApiBody
 } from '@nestjs/swagger';
 
-@ApiTags('Reservations')
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+
+@ApiTags('Réservations')
 @Controller('reservations')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth()
 export class ReservationController {
+
   constructor(private readonly reservationService: ReservationService) {}
 
-  // créer réservation
+  // ===== CREATE =====
   @Post()
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        date_debut: { type: 'string', format: 'date', example: '2026-03-20' },
-        date_fin: { type: 'string', format: 'date', example: '2026-03-25' },
-        statut: { type: 'string', example: 'en attente' },
-        clientId: { type: 'number', example: 1 },
-        hotelManagerId: { type: 'number', example: 1 },
-        chambresIds: { type: 'array', items: { type: 'number' }, example: [1, 2] },
-      },
-      required: ['date_debut', 'date_fin', 'clientId', 'hotelManagerId', 'chambresIds']
-    }
-  })
+  @Roles('client')
+  @ApiOperation({ summary: 'Créer une réservation' })
+  @ApiBody({ type: CreateReservationDto })
   @ApiResponse({ status: 201, description: 'Réservation créée avec succès' })
-  create(@Body() reservation: any) {
-    return this.reservationService.create(reservation);
+  create(@Body() dto: CreateReservationDto) {
+    return this.reservationService.create(dto);
   }
 
-  // confirmer réservation
+  // ===== CONFIRMER =====
   @Patch('confirmer/:id/:clientId')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiParam({ name: 'clientId', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Réservation confirmée' })
+  @Roles('hotel-manager')
+  @ApiOperation({ summary: 'Confirmer une réservation' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiParam({ name: 'clientId', example: 1 })
   confirmer(
     @Param('id', ParseIntPipe) id: number,
-    @Param('clientId', ParseIntPipe) clientId: number,
+    @Param('clientId', ParseIntPipe) clientId: number,   
   ) {
     return this.reservationService.confirmerReservation(id, clientId);
   }
 
-  // annuler réservation
+  // ===== ANNULER =====
   @Patch('annuler/:id/:clientId')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiParam({ name: 'clientId', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Réservation annulée' })
+  @Roles('hotel-manager', 'client')
+  @ApiOperation({ summary: 'Annuler une réservation' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiParam({ name: 'clientId', example: 1 })
   annuler(
     @Param('id', ParseIntPipe) id: number,
     @Param('clientId', ParseIntPipe) clientId: number,
@@ -58,27 +60,49 @@ export class ReservationController {
     return this.reservationService.annulerReservation(id, clientId);
   }
 
-  // afficher toutes les réservations
+  // ===== UPDATE =====
+  @Patch(':id')
+  @Roles('hotel-manager')
+  @ApiOperation({ summary: 'Modifier les dates ou statut d’une réservation' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: UpdateReservationDto })
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateReservationDto,
+    @Request() req: any
+  ) {
+    return this.reservationService.updateDates(
+      id,
+      req.user.iduser,
+      req.user.role,
+      dto
+    );
+  }
+
+  // ===== FIND ALL =====
   @Get()
+  @Roles('admin', 'client', 'hotel-manager')
+  @ApiOperation({ summary: 'Lister toutes les réservations selon le rôle' })
   @ApiResponse({ status: 200, description: 'Liste des réservations' })
-  findAll() {
-    return this.reservationService.findAll();
+  findAll(@Request() req: any) {
+    return this.reservationService.findAll(req.user.iduser, req.user.role);
   }
 
-  // afficher réservation par id
+  // ===== FIND ONE =====
   @Get(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Réservation trouvée' })
-  @ApiResponse({ status: 404, description: 'Réservation non trouvée' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.reservationService.findOne(id);
+  @Roles('admin', 'client', 'hotel-manager')
+  @ApiOperation({ summary: 'Afficher une réservation' })
+  @ApiParam({ name: 'id', example: 1 })
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.reservationService.findOne(id, req.user.iduser, req.user.role);
   }
 
-  // supprimer réservation
+  // ===== DELETE =====
   @Delete(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Réservation supprimée' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.reservationService.remove(id);
+  @Roles('admin', 'hotel-manager')
+  @ApiOperation({ summary: 'Supprimer une réservation' })
+  @ApiParam({ name: 'id', example: 1 })
+  remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.reservationService.remove(id, req.user.iduser, req.user.role);
   }
 }

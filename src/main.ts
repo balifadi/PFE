@@ -2,29 +2,44 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
-async function bootstrap() {
-  // Crée l'application NestJS
-  const app = await NestFactory.create(AppModule);
+// ✅ AJOUT
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 
-  // Configuration de Swagger
+async function bootstrap() {
+
+  // ⚠️ IMPORTANT (type Express)
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // ================= CORS =================
+  app.enableCors({
+    origin: 'http://localhost:4200',
+    credentials: true,
+  });
+
+  // ================= STATIC FILES (IMAGE) =================
+  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+    prefix: '/uploads/',
+  });
+
+  // ================= SWAGGER =================
   const config = new DocumentBuilder()
     .setTitle('API Tourisme')
-    .setDescription('API pour gérer hôtels,agences,réservations,locations')
+    .setDescription('API pour gérer hôtels, agences, réservations, locations')
     .setVersion('1.0')
-    .addBearerAuth() // Si tu utilises JWT pour l'authentification
+    .addBearerAuth()
     .build();
-  
-  // Génération de la documentation Swagger
+
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  // Lancement du serveur sur le port configuré ou 3000 par défaut
+  // ================= START SERVER =================
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
- // Affichage des URLs dans le terminal pour tester facilement
   console.log(` Serveur démarré sur http://localhost:${port}`);
   console.log(` Swagger disponible sur http://localhost:${port}/api`);
+  console.log(` Images accessibles sur http://localhost:${port}/uploads`);
 }
 
 bootstrap();

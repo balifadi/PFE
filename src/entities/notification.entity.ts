@@ -17,6 +17,9 @@ export class Notification {
   @Column({ type: 'date' })
   date_Envoi: Date;
 
+  @Column({ default: false })
+  isRead: boolean;
+
   @ManyToOne(() => Admin, (admin) => admin.notifications, { nullable: true })
   admin: Admin;
 

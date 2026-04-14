@@ -15,7 +15,7 @@ export class Zone {
   @Column({ type: 'text' })
   description: string;
 
-  @Column()
+  @Column({ nullable: true })
   imagePath: string;
 
   @Column({ type: 'double' })

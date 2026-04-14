@@ -1,136 +1,92 @@
 import {
   Controller, Get, Post, Body, Param, Delete, Put,
-  Request, UseGuards, ParseIntPipe
+  Request, UseGuards, ParseIntPipe, UsePipes, ValidationPipe
 } from '@nestjs/common';
-
 import { UserService } from './user.service';
-import { User } from '../entities/user.entity';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { LoginUserDto } from './dto/login-user.dto';
+import { LoginResponseDto } from './dto/login-response.dto';
 
-import {
-  ApiTags, ApiBody, ApiParam,
-  ApiResponse, ApiBearerAuth
-} from '@nestjs/swagger';
-
+import { ApiTags, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @ApiTags('Users')
 @Controller('users')
 export class UserController {
-
   constructor(private readonly userService: UserService) {}
 
   // ================= REGISTER =================
   @Post('register')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['nom','email','password','telephone','role'],
-      properties: {
-        nom: { type: 'string', example: 'Mehdi' },
-        email: { type: 'string', example: 'mehdi@gmail.com' },
-        password: { type: 'string', example: '123456' },
-        telephone: { type: 'string', example: '22334455' },
-        role: { type: 'string', example: 'client' }
-      }
-    }
-  })
-  @ApiResponse({ status: 201, description: 'User created successfully' })
-  register(@Body() body: Partial<User>) {
-    return this.userService.register(body);
+  @ApiBody({ type: CreateUserDto })
+  @ApiResponse({ status: 201, description: 'User created successfully', type: LoginResponseDto })
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async register(@Body() createUserDto: CreateUserDto): Promise<LoginResponseDto> {
+    const user = await this.userService.register(createUserDto);
+    const access_token = this.userService.generateToken(user as any);
+    return { ...user, access_token, role: user.role as 'admin' | 'client' | 'hotel-manager' | 'agence-manager' };
   }
 
   // ================= LOGIN =================
   @Post('login')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['email','password'],
-      properties: {
-        email: { type: 'string', example: 'mehdi@gmail.com' },
-        password: { type: 'string', example: '123456' }
-      }
-    }
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'JWT Token',
-    schema: {
-      example: {
-        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
-      }
-    }
-  })
-  async login(@Body() body: { email: string; password: string }) {
-
-    const user = await this.userService.validateUser(
-      body.email,
-      body.password,
-    );
-
-    return this.userService.login(user);
+  @ApiBody({ type: LoginUserDto })
+  @ApiResponse({ status: 200, description: 'Login success', type: LoginResponseDto })
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  async login(@Body() loginUserDto: LoginUserDto): Promise<LoginResponseDto> {
+    return this.userService.login(loginUserDto);
   }
 
-  // ================= PROFILE =================
-  @UseGuards(JwtAuthGuard)
+
+  // ================= ADMIN ONLY =================
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @ApiBearerAuth()
-  @Get('profile')
-  @ApiResponse({
-    status: 200,
-    description: 'Profil utilisateur',
-    schema: {
-      example: {
-        iduser: 1,
-        nom: 'Mehdi',
-        email: 'mehdi@gmail.com',
-        telephone: '22334455',
-        role: 'Client'
-      }
-    }
-  })
-  async getProfile(@Request() req: any) {
-    return this.userService.getProfile(req.user.iduser);
-  }
-
-  // ================= GET ALL =================
   @Get()
-  @ApiResponse({ status: 200, description: 'List of users' })
-  findAll() {
-    return this.userService.findAll();
+  async findAll(@Request() req: any) {
+    return this.userService.findAll(req.user);
   }
 
-  // ================= GET ONE =================
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
   @Get(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Single user' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.userService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.userService.findOne(id, req.user);
   }
 
-  // ================= UPDATE =================
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
   @Put(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        nom: { type: 'string' },
-        email: { type: 'string' },
-        password: { type: 'string' },
-        telephone: { type: 'string' },
-        role: { type: 'string' }
-      }
-    }
-  })
-  @ApiResponse({ status: 200, description: 'User updated' })
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<User>) {
-    return this.userService.update(id, data);
+  async update(@Param('id', ParseIntPipe) id: number, @Body() updateUserDto: UpdateUserDto, @Request() req: any) {
+    return this.userService.update(id, updateUserDto, req.user);
   }
 
-  // ================= DELETE =================
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
   @Delete(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'User deleted' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.userService.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.userService.remove(id, req.user);
+  }
+
+  // ================= GET USERS BY ROLE =================
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @Get('role/:role')
+  async getUsersByRole(@Param('role') role: string, @Request() req: any) {
+    return this.userService.findUsersByRole(role, req.user);
+  }
+
+  // ================= GET SINGLE USER BY ROLE AND ID =================
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @Get('role/:role/:id')
+  async getUserByRoleAndId(@Param('role') role: string, @Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.userService.findUserByRoleAndId(role, id, req.user);
   }
 }

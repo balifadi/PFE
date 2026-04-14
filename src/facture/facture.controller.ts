@@ -1,70 +1,100 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller, Get, Post, Patch, Put,
+  Body, Param, Query, ParseIntPipe,
+  UseGuards, Request
+} from '@nestjs/common';
+
 import { FactureService } from './facture.service';
-import { ApiTags, ApiParam, ApiQuery, ApiBody, ApiResponse } from '@nestjs/swagger';
+import { CreateFactureDto } from './dto/create-facture.dto';
+import { UpdateFactureDto } from './dto/update-facture.dto';
+
+import {
+  ApiTags, ApiBearerAuth, ApiOperation,
+  ApiBody, ApiParam, ApiQuery, ApiResponse
+} from '@nestjs/swagger';
+
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @ApiTags('Factures')
 @Controller('factures')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class FactureController {
+
   constructor(private readonly factureService: FactureService) {}
 
+  // ===== CREATE MANUEL =====
   @Post()
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        clientId: { type: 'number', example: 1 },
-        reservationId: { type: 'number', example: 1 },
-        locationId: { type: 'number', example: 1 },
-        mode_Paiement: { type: 'string', example: 'Carte bancaire' },
-        montant_Total: { type: 'number', example: 500 },
-        date_Facture: { type: 'string', format: 'date', example: '2026-03-22' },
-        statut: { type: 'string', example: 'non payée' },
-      },
-       required: ['clientId', 'mode_Paiement', 'montant_Total', 'date_Facture'],
-    }
-  })
-  @ApiResponse({ status: 201, description: 'Facture créée' })
-  create(@Body() facture: any) {
-    return this.factureService.create(facture);
+  @Roles('hotel-manager', 'agence-manager')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Créer une facture manuelle' })
+  @ApiBody({ type: CreateFactureDto })
+  @ApiResponse({ status: 201, description: 'Facture créée et notification envoyée' })
+  create(@Body() dto: CreateFactureDto, @Request() req: any) {
+    return this.factureService.create(dto);
   }
 
-  // création avec query params optionnelles
+  // ===== CREATE AUTOMATIQUE =====
   @Post('from')
-  @ApiQuery({ name: 'reservationId', type: Number, required: false })
-  @ApiQuery({ name: 'locationId', type: Number, required: false })
-  @ApiResponse({ status: 201, description: 'Facture générée depuis réservation ou location' })
+  @Roles('hotel-manager', 'agence-manager')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Créer une facture automatiquement depuis réservation ou location' })
+  @ApiQuery({ name: 'reservationId', required: false, type: Number, description: 'ID de la réservation' })
+  @ApiQuery({ name: 'locationId', required: false, type: Number, description: 'ID de la location' })
+  @ApiResponse({ status: 201, description: 'Facture créée automatiquement' })
   createFacture(
-    @Query('reservationId', ParseIntPipe) reservationId?: number,
-    @Query('locationId', ParseIntPipe) locationId?: number,
+    @Query('reservationId') reservationId?: number,
+    @Query('locationId') locationId?: number,
   ) {
     return this.factureService.createFacture(reservationId, locationId);
   }
 
-  @Patch(':id/statut')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiBody({ schema: { type: 'object', properties: { statut: { type: 'string', example: 'payée' } }, required: ['statut'] } })
-  @ApiResponse({ status: 200, description: 'Statut mis à jour' })
-  updateStatut(@Param('id', ParseIntPipe) id: number, @Body('statut') statut: string) {
-    return this.factureService.updateStatut(id, statut);
+  // ===== PAIEMENT =====
+  @Put(':id/payer')
+  @Roles('client')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Payer une facture (simulation)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiResponse({ status: 200, description: 'Facture payée avec succès' })
+  payer(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.factureService.payer(id, req.user.iduser);
   }
 
-  @Get(':id/montant-total')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Montant total calculé' })
-  calculerMontantTotal(@Param('id', ParseIntPipe) id: number) {
-    return this.factureService.calculerMontantTotal(id);
+  // ===== UPDATE =====
+  @Patch(':id')
+  @Roles('hotel-manager', 'agence-manager')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mettre à jour une facture' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: UpdateFactureDto })
+  @ApiResponse({ status: 200, description: 'Facture mise à jour' })
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateFactureDto,
+    @Request() req: any
+  ) {
+    return this.factureService.update(id, dto);
   }
 
+  // ===== GET ALL =====
   @Get()
+  @Roles('admin', 'client', 'hotel-manager', 'agence-manager')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lister toutes les factures' })
   @ApiResponse({ status: 200, description: 'Liste des factures' })
-  findAll() {
-    return this.factureService.findAll();
+  findAll(@Request() req: any) {
+    return this.factureService.findAll(req.user.iduser, req.user.role);
   }
 
+  // ===== GET ONE =====
   @Get(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Facture trouvée' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.factureService.findOne(id);
+  @Roles('admin', 'client', 'hotel-manager', 'agence-manager')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Afficher une facture' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiResponse({ status: 200, description: 'Détails de la facture' })
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.factureService.findOne(id, req.user.iduser, req.user.role);
   }
 }

@@ -1,45 +1,41 @@
-import { Controller, Get, Post, Body, Param, Delete, Patch, ParseIntPipe } from '@nestjs/common';
-import { LocationService } from './location.service';
-import { Location } from '../entities/location.entity';
 import {
-  ApiTags,
-  ApiParam,
-  ApiBody,
-  ApiResponse,
-} from '@nestjs/swagger';
+  Controller, Get, Post, Patch, Delete,
+  Body, Param, ParseIntPipe, UseGuards, Request
+} from '@nestjs/common';
+
+import { LocationService } from './location.service';
+import { CreateLocationDto } from './dto/create-location.dto';
+import { UpdateLocationDto } from './dto/update-location.dto';
+
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiBody } from '@nestjs/swagger';
 
 @ApiTags('Locations')
 @Controller('locations')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth()
 export class LocationController {
 
   constructor(private readonly locationService: LocationService) {}
 
-  // créer location
+  // ===== CREATE =====
   @Post()
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        date_debut: { type: 'string', format: 'date', example: '2026-03-20' },
-        date_fin: { type: 'string', format: 'date', example: '2026-03-25' },
-        statut: { type: 'string', example: 'en attente' },
-        clientId: { type: 'number', example: 1 },
-        agenceManagerId: { type: 'number', example: 1 },
-        voitureId: { type: 'number', example: 1 },
-      },
-      required: ['date_debut', 'date_fin', 'clientId', 'agenceManagerId', 'voitureId']
-    }
-  })
-  @ApiResponse({ status: 201, description: 'Location créée avec succès' })
-  create(@Body() location: any) {
-    return this.locationService.create(location);
+  @Roles('client')
+  @ApiOperation({ summary: 'Créer une nouvelle location' })
+  @ApiBody({ type: CreateLocationDto })
+  create(@Body() dto: CreateLocationDto) {
+    return this.locationService.create(dto);
   }
 
-  // confirmer location
+  // ===== CONFIRMER =====
   @Patch('confirmer/:id/:clientId')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiParam({ name: 'clientId', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Location confirmée' })
+  @Roles('agence-manager')
+  @ApiOperation({ summary: 'Confirmer une location par l’agence' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiParam({ name: 'clientId', example: 5 })
   confirmer(
     @Param('id', ParseIntPipe) id: number,
     @Param('clientId', ParseIntPipe) clientId: number,
@@ -47,11 +43,12 @@ export class LocationController {
     return this.locationService.confirmerLocation(id, clientId);
   }
 
-  // annuler location
+  // ===== ANNULER =====
   @Patch('annuler/:id/:clientId')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiParam({ name: 'clientId', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Location annulée' })
+  @Roles('agence-manager', 'client')
+  @ApiOperation({ summary: 'Annuler une location' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiParam({ name: 'clientId', example: 5 })
   annuler(
     @Param('id', ParseIntPipe) id: number,
     @Param('clientId', ParseIntPipe) clientId: number,
@@ -59,27 +56,54 @@ export class LocationController {
     return this.locationService.annulerLocation(id, clientId);
   }
 
-  // afficher toutes les locations
+  // ===== UPDATE =====
+  @Patch(':id')
+  @Roles('agence-manager')
+  @ApiOperation({ summary: 'Mettre à jour les dates ou statut de la location' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: UpdateLocationDto })
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateLocationDto,
+    @Request() req: any
+  ) {
+    return this.locationService.updateDates(
+      id,
+      req.user.iduser,
+      req.user.role,
+      dto
+    );
+  }
+
+  // ===== FIND ALL =====
   @Get()
-  @ApiResponse({ status: 200, description: 'Liste des locations' })
-  findAll() {
-    return this.locationService.findAll();
+  @Roles('admin', 'client', 'agence-manager')
+  @ApiOperation({ summary: 'Lister toutes les locations selon le rôle' })
+  findAll(@Request() req: any) {
+    return this.locationService.findAll(req.user.iduser, req.user.role);
   }
 
-  // afficher location par id
+  // ===== FIND ONE =====
   @Get(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Location trouvée' })
-  @ApiResponse({ status: 404, description: 'Location non trouvée' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.locationService.findOne(id);
+  @Roles('admin', 'client', 'agence-manager')
+  @ApiOperation({ summary: 'Afficher une location par ID' })
+  @ApiParam({ name: 'id', example: 1 })
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any
+  ) {
+    return this.locationService.findOne(id, req.user.iduser, req.user.role);
   }
 
-  // supprimer location
+  // ===== DELETE =====
   @Delete(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Location supprimée' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.locationService.remove(id);
+  @Roles('admin', 'agence-manager')
+  @ApiOperation({ summary: 'Supprimer une location' })
+  @ApiParam({ name: 'id', example: 1 })
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any
+  ) {
+    return this.locationService.remove(id, req.user.iduser, req.user.role);
   }
 }

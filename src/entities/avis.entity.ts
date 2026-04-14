@@ -20,6 +20,8 @@ export class Avis {
   @Column({ type: 'date' })
   date_Avis: Date;
 
+  @Column()
+  targetId: number;
   @ManyToOne(() => Admin, (admin) => admin.avis)
   admin: Admin;
 

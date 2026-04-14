@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
 import { Admin } from './admin.entity';
 import { Voiture } from './voiture.entity';
+import { AgenceManager } from './agence-manager.entity'; // ✅ مهم
 
 @Entity()
 export class Agence {
@@ -26,7 +27,10 @@ export class Agence {
   @ManyToOne(() => Admin, (admin) => admin.agences)
   admin: Admin;
 
+  // 🔥 relation ajoutée مع AgenceManager
+  @ManyToOne(() => AgenceManager, (manager) => manager.agences, { nullable: true })
+  agenceManager: AgenceManager;
+
   @OneToMany(() => Voiture, (voiture) => voiture.agence)
   voitures: Voiture[];
-
 }

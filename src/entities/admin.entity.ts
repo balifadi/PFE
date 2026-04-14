@@ -6,7 +6,7 @@ import { Agence } from './agence.entity';
 import { Notification } from './notification.entity';
 import { Avis } from './avis.entity';
 
-@ChildEntity()
+@ChildEntity('admin') // ✅ valeur explicite
 export class Admin extends User {
 
   @OneToMany(() => Zone, (zone) => zone.admin)
@@ -23,5 +23,4 @@ export class Admin extends User {
 
   @OneToMany(() => Avis, (avis) => avis.admin)
   avis: Avis[];
-
 }

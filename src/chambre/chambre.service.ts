@@ -1,74 +1,130 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, MoreThan } from 'typeorm';
 import { Chambre } from '../entities/chambre.entity';
 import { Reservation } from '../entities/reservation.entity';
+import { CreateChambreDto } from './dto/create-chambre.dto';
+import { UpdateChambreDto } from './dto/update-chambre.dto';
 
 @Injectable()
 export class ChambreService {
+
   constructor(
     @InjectRepository(Chambre)
     private readonly chambreRepository: Repository<Chambre>,
+
     @InjectRepository(Reservation)
     private readonly reservationRepository: Repository<Reservation>,
   ) {}
 
-  // créer une chambre
-  async create(chambre: Partial<Chambre>): Promise<Chambre> {
-    const newChambre = this.chambreRepository.create(chambre);
-    return await this.chambreRepository.save(newChambre);
+  // ✅ CREATE
+  async create(dto: CreateChambreDto, user: any): Promise<Chambre> {
+
+    if (user.role === 'admin') {
+      const chambre = this.chambreRepository.create({
+        ...dto,
+        hotel: { idhotel: dto.hotelId },
+      });
+      return this.chambreRepository.save(chambre);
+    }
+
+    if (user.role === 'hotel-manager') {
+      const chambre = this.chambreRepository.create({
+        ...dto,
+        hotel: { idhotel: dto.hotelId },
+        hotelManager: { iduser: user.id },
+      });
+      return this.chambreRepository.save(chambre);
+    }
+
+    throw new ForbiddenException("Accès refusé");
   }
 
-  // lister toutes les chambres
-  async findAll(): Promise<Chambre[]> {
-    return await this.chambreRepository.find({
-      relations: ['hotelManager', 'hotel', 'reservation'],
+  // ✅ FIND ALL
+  async findAll(userId: number, role: string): Promise<Chambre[]> {
+
+    if (role === 'admin') {
+      return this.chambreRepository.find({
+        relations: ['hotelManager', 'hotel', 'reservation'],
+      });
+    }
+
+    if (role === 'hotel-manager') {
+      return this.chambreRepository.find({
+        where: { hotelManager: { iduser: userId } },
+        relations: ['hotelManager', 'hotel', 'reservation'],
+      });
+    }
+
+    // client + agence-manager
+    return this.chambreRepository.find({
+      relations: ['hotel', 'reservation'],
     });
   }
 
-  // chambre par ID
-  async findOne(id: number): Promise<Chambre | null> {
-    return await this.chambreRepository.findOne({
+  // ✅ FIND ONE
+  async findOne(id: number, userId: number, role: string): Promise<Chambre> {
+
+    const chambre = await this.chambreRepository.findOne({
       where: { idchambre: id },
-      relations: ['hotelManager', 'hotel', 'reservation'],
+      relations: ['hotelManager', 'hotel', 'reservation', 'reservation.client'],
     });
+
+    if (!chambre) throw new NotFoundException('Chambre non trouvée');
+
+    if (role === 'hotel-manager' && chambre.hotelManager?.iduser !== userId) {
+      throw new ForbiddenException("Accès refusé");
+    }
+
+    return chambre;
   }
 
-  // mettre à jour chambre
-  async update(id: number, data: Partial<Chambre>): Promise<Chambre | null> {
-    await this.chambreRepository.update(id, data);
-    return this.findOne(id);
+  // ✅ UPDATE
+  async update(id: number, user: any, dto: UpdateChambreDto): Promise<Chambre> {
+
+    const chambre = await this.chambreRepository.findOne({
+      where: { idchambre: id },
+      relations: ['hotelManager'],
+    });
+
+    if (!chambre) throw new NotFoundException('Chambre non trouvée');
+
+    if (user.role === 'admin') {
+      await this.chambreRepository.update(id, dto);
+      return this.findOne(id, user.id, user.role);
+    }
+
+    if (user.role === 'hotel-manager') {
+      if (chambre.hotelManager?.iduser !== user.id) {
+        throw new ForbiddenException("Vous ne pouvez modifier que vos chambres");
+      }
+
+      await this.chambreRepository.update(id, dto);
+      return this.findOne(id, user.id, user.role);
+    }
+
+    throw new ForbiddenException("Accès refusé");
   }
 
-  // supprimer chambre
-  async remove(id: number) {
-    return await this.chambreRepository.delete(id);
+  // ✅ DELETE
+  async remove(id: number, user: any): Promise<void> {
+
+    const chambre = await this.chambreRepository.findOne({
+      where: { idchambre: id },
+    });
+
+    if (!chambre) throw new NotFoundException('Chambre non trouvée');
+
+    if (user.role !== 'admin') {
+      throw new ForbiddenException("Seul l'admin peut supprimer");
+    }
+
+    await this.chambreRepository.delete(id);
   }
 
-  // modifier prix par nuit
-  async updatePrixNuit(id: number, prix: number) {
-    await this.chambreRepository.update(id, { prix_Nuit: prix });
-    return this.findOne(id);
-  }
+  // ✅ DISPONIBILITÉ
+  async verifierDisponibilite(id: number, dateDebut: Date, dateFin: Date): Promise<{ disponible: boolean }> {
 
-  // modifier état
-  async updateEtatChambre(id: number, etat: string) {
-    await this.chambreRepository.update(id, { etat });
-    return this.findOne(id);
-  }
-
-  // modifier capacité
-  async updateCapacite(id: number, capacite: number) {
-    await this.chambreRepository.update(id, { capacite });
-    return this.findOne(id);
-  }
-
-  // vérifier disponibilité chambre
-  async verifierDisponibilite(
-    id: number,
-    dateDebut: Date,
-    dateFin: Date,
-  ): Promise<boolean> {
     const reservations = await this.reservationRepository.find({
       where: {
         chambres: { idchambre: id },
@@ -76,6 +132,7 @@ export class ChambreService {
         date_fin: MoreThan(dateDebut),
       },
     });
-    return reservations.length === 0;
+
+    return { disponible: reservations.length === 0 };
   }
 }

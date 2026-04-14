@@ -1,9 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, TableInheritance } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  TableInheritance
+} from 'typeorm';
 
 @Entity()
 @TableInheritance({ column: { type: 'varchar', name: 'role' } })
 export class User {
-
   @PrimaryGeneratedColumn()
   iduser: number;
 
@@ -16,10 +20,7 @@ export class User {
   @Column()
   password: string;
 
-  @Column()
-  telephone: string;
-
-   @Column()
+  // ✅ SOLUTION : Ajouter @Column avec le nom exact de la colonne BDD
+  @Column({ name: 'role' })
   role: string;
-
 }

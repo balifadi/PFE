@@ -1,23 +1,29 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { Agence } from '../entities/agence.entity';
 import { Admin } from '../entities/admin.entity';
 import { Voiture } from '../entities/voiture.entity';
-import { NotificationModule } from '../notification/notification.module'; // pour NotificationService
+import { AgenceManager } from '../entities/agence-manager.entity';
+
+import { NotificationModule } from '../notification/notification.module';
 import { AgenceService } from './agence.service';
 import { AgenceController } from './agence.controller';
+import { Client } from '../entities/client.entity';
+import { Notification } from '../entities/notification.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       Agence,
       Admin,
-      Voiture, // 🔹 nécessaire pour charger relations: ['voitures']
+      Client,
+      Notification
     ]),
-    NotificationModule, // 🔹 pour NotificationService
+    NotificationModule,
   ],
   controllers: [AgenceController],
   providers: [AgenceService],
-  exports: [AgenceService], // pour réutiliser le service ailleurs
+  exports: [AgenceService],
 })
 export class AgenceModule {}

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 // Entities
 import { User } from './entities/user.entity';
@@ -16,7 +17,8 @@ import { Location } from './entities/location.entity';
 import { Facture } from './entities/facture.entity';
 import { Agence } from './entities/agence.entity';
 import { Avis } from './entities/avis.entity';
-import { Notification } from './entities/notification.entity'; 
+import { Notification } from './entities/notification.entity';
+import { Favoris } from './entities/favoris.entity';
 
 // Modules
 import { UserModule } from './user/user.module';
@@ -34,10 +36,14 @@ import { FactureModule } from './facture/facture.module';
 import { AgenceModule } from './agence/agence.module';
 import { AvisModule } from './avis/avis.module';
 import { NotificationModule } from './notification/notification.module';
-
+import { FavorisModule } from './favoris/favoris.module';
 
 @Module({
   imports: [
+    // Event system
+    EventEmitterModule.forRoot(),
+
+    // Database
     TypeOrmModule.forRoot({
       type: 'mysql',
       host: 'localhost',
@@ -61,6 +67,7 @@ import { NotificationModule } from './notification/notification.module';
         Agence,
         Avis,
         Notification,
+        Favoris,
       ],
       synchronize: true,
     }),
@@ -81,6 +88,7 @@ import { NotificationModule } from './notification/notification.module';
     AgenceModule,
     AvisModule,
     NotificationModule,
+    FavorisModule,
   ],
   controllers: [],
   providers: [],

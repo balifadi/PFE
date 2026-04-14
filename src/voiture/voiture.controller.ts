@@ -1,107 +1,102 @@
 import {
-  Controller, Get, Post, Body, Param, Delete, Put, Query, ParseIntPipe
+  Controller, Get, Post, Body, Param,
+  Delete, Put, Query, ParseIntPipe,
+  UseGuards, Request
 } from '@nestjs/common';
+
 import { VoitureService } from './voiture.service';
-import { Voiture } from '../entities/voiture.entity';
+import { CreateVoitureDto } from './dto/create-voiture.dto';
+import { UpdateVoitureDto } from './dto/update-voiture.dto';
+
 import {
   ApiTags,
-  ApiParam,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiOperation,
   ApiBody,
-  ApiResponse,
-  ApiQuery   // ✅ لازم تضيفها هنا
+  ApiParam,
+  ApiResponse
 } from '@nestjs/swagger';
+
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @ApiTags('Voitures')
 @Controller('voitures')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class VoitureController {
+
   constructor(private readonly voitureService: VoitureService) {}
 
-  // ===============================
-  // créer voiture
-  // ===============================
+  // ===== CREATE =====
   @Post()
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        marque: { type: 'string', example: 'Toyota' },
-        modele: { type: 'string', example: 'Corolla' },
-        immatriculation: { type: 'string', example: 'TN-123-456' },
-        etat: { type: 'string', example: 'neuf' },
-        prix_Jour: { type: 'number', example: 50 },
-        agenceId: { type: 'number', example: 1 },
-        agenceManagerId: { type: 'number', example: 1 },
-        locationId: { type: 'number', example: 1 },
-      },
-      required: ['marque', 'modele', 'immatriculation', 'etat', 'prix_Jour', 'agenceId']
-    }
-  })
+  @Roles('admin', 'agence-manager')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Créer une voiture' })
+  @ApiBody({ type: CreateVoitureDto })
   @ApiResponse({ status: 201, description: 'Voiture créée avec succès' })
-  @ApiResponse({ status: 400, description: 'Erreur lors de la création' })
-  create(@Body() voiture: any) {
-    return this.voitureService.create(voiture);
+  create(@Body() dto: CreateVoitureDto, @Request() req: any) {
+    return this.voitureService.create(dto, req.user);
   }
 
-  // ===============================
-  // lister toutes les voitures
-  // ===============================
+  // ===== FIND ALL =====
   @Get()
+  @Roles('admin', 'agence-manager', 'client', 'hotel-manager')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lister toutes les voitures' })
   @ApiResponse({ status: 200, description: 'Liste des voitures' })
-  findAll() {
-    return this.voitureService.findAll();
+  findAll(@Request() req: any) {
+    return this.voitureService.findAll(req.user.iduser, req.user.role);
   }
 
-  // ===============================
-  // voiture par ID
-  // ===============================
+  // ===== FIND ONE =====
   @Get(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Voiture trouvée' })
-  @ApiResponse({ status: 404, description: 'Voiture non trouvée' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.voitureService.findOne(id);
+  @Roles('admin', 'agence-manager', 'client', 'hotel-manager')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Afficher une voiture' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiResponse({ status: 200, description: 'Détails de la voiture' })
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.voitureService.findOne(id, req.user.iduser, req.user.role);
   }
 
-  // ===============================
-  // mettre à jour voiture
-  // ===============================
+  // ===== UPDATE =====
   @Put(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        marque: { type: 'string', example: 'Toyota' },
-        modele: { type: 'string', example: 'Corolla' },
-        immatriculation: { type: 'string', example: 'TN-123-456' },
-        etat: { type: 'string', example: 'neuf' },
-        prix_Jour: { type: 'number', example: 55 },
-      }
-    }
-  })
+  @Roles('admin', 'agence-manager')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Modifier une voiture' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: UpdateVoitureDto })
   @ApiResponse({ status: 200, description: 'Voiture mise à jour' })
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<Voiture>) {
-    return this.voitureService.update(id, data);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateVoitureDto,
+    @Request() req: any
+  ) {
+    return this.voitureService.update(id, req.user, dto);
   }
 
-  // ===============================
-  // supprimer voiture
-  // ===============================
+  // ===== DELETE =====
   @Delete(':id')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Supprimer une voiture' })
+  @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 200, description: 'Voiture supprimée' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.voitureService.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.voitureService.remove(id, req.user);
   }
 
-  // ===============================
-  // vérifier disponibilité
-  // ===============================
+  // ===== DISPONIBILITÉ =====
   @Get(':id/disponibilite')
-  @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiQuery({ name: 'dateDebut', type: String, example: '2026-03-20' })
-  @ApiQuery({ name: 'dateFin', type: String, example: '2026-03-25' })
-  @ApiResponse({ status: 200, description: 'Disponibilité vérifiée' })
+  @Roles('admin', 'agence-manager', 'client', 'hotel-manager')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Vérifier disponibilité voiture' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiQuery({ name: 'dateDebut', type: String, example: '2026-04-01' })
+  @ApiQuery({ name: 'dateFin', type: String, example: '2026-04-05' })
+  @ApiResponse({ status: 200, description: 'Disponibilité de la voiture' })
   verifierDisponibilite(
     @Param('id', ParseIntPipe) id: number,
     @Query('dateDebut') dateDebut: string,
@@ -110,7 +105,7 @@ export class VoitureController {
     return this.voitureService.verifierDisponibilite(
       id,
       new Date(dateDebut),
-      new Date(dateFin),
+      new Date(dateFin)
     );
   }
 }

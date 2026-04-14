@@ -1,8 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Client } from '../entities/client.entity';
-import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class ClientService {
@@ -12,45 +11,87 @@ export class ClientService {
     private clientRepository: Repository<Client>,
   ) {}
 
-  // ================= GET ALL =================
-  async findAll(): Promise<Client[]> {
-    return await this.clientRepository.find({
-      relations: [
-        'reservations',
-        'locations',
-        'facture',
-        'notifications',
-        'avis',
-      ],
-    });
-  }
-
-  // ================= GET ONE =================
-  async findOne(id: number): Promise<Client | null> {
-    return await this.clientRepository.findOne({
-      where: { iduser: id },
-      relations: [
-        'reservations',
-        'locations',
-        'facture',
-        'notifications',
-        'avis',
-      ],
-    });
-  }
-
-  // ================= UPDATE =================
-  async update(id: number, data: Partial<Client>) {
-
-    if (data.password) {
-      data.password = await bcrypt.hash(data.password, 10); // 🔥 hash
+  // ===============================
+  // ✅ ADMIN → GET ALL CLIENTS
+  // ===============================
+  async findAll(currentUser: any): Promise<Client[]> {
+    if (currentUser.role !== 'admin') {
+      throw new ForbiddenException('Admins only');
     }
 
-    return await this.clientRepository.update(id, data);
+    return this.clientRepository.find({
+      relations: ['reservations', 'locations', 'facture', 'notifications', 'avis'],
+    });
   }
 
-  // ================= DELETE =================
-  async remove(id: number) {
-    return await this.clientRepository.delete(id);
+  // ===============================
+  // ✅ CLIENT ACCOUNT (sécurisé)
+  // ===============================
+
+  async getProfile(clientId: number) {
+    const client = await this.clientRepository.findOne({
+      where: { iduser: clientId },
+      relations: ['reservations', 'locations', 'favoris', 'notifications', 'avis', 'facture'],
+    });
+
+    if (!client) {
+      throw new ForbiddenException('Client not found');
+    }
+
+    return client;
+  }
+
+  async getReservations(clientId: number) {
+    const client = await this.clientRepository.findOne({
+      where: { iduser: clientId },
+      relations: ['reservations'],
+    });
+
+    return client?.reservations || [];
+  }
+
+  async getLocations(clientId: number) {
+    const client = await this.clientRepository.findOne({
+      where: { iduser: clientId },
+      relations: ['locations'],
+    });
+
+    return client?.locations || [];
+  }
+
+  async getFavoris(clientId: number) {
+    const client = await this.clientRepository.findOne({
+      where: { iduser: clientId },
+      relations: ['favoris'],
+    });
+
+    return client?.favoris || [];
+  }
+
+  async getNotifications(clientId: number) {
+    const client = await this.clientRepository.findOne({
+      where: { iduser: clientId },
+      relations: ['notifications'],
+    });
+
+    return client?.notifications || [];
+  }
+
+  async getAvis(clientId: number) {
+    const client = await this.clientRepository.findOne({
+      where: { iduser: clientId },
+      relations: ['avis'],
+    });
+
+    return client?.avis || [];
+  }
+
+  async getFactures(clientId: number) {
+    const client = await this.clientRepository.findOne({
+      where: { iduser: clientId },
+      relations: ['facture'],
+    });
+
+    return client?.facture || [];
   }
 }

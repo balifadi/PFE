@@ -1,11 +1,11 @@
-
 import { ChildEntity, OneToMany } from 'typeorm';
 import { User } from './user.entity';
 import { Chambre } from './chambre.entity';
 import { Reservation } from './reservation.entity';
+import { Hotel } from './hotel.entity';
 
-@ChildEntity()
-export class HotelManager extends User {  //تأكد من وجود export
+@ChildEntity('hotel-manager') // ✅ valeur explicite
+export class HotelManager extends User {
 
   @OneToMany(() => Chambre, (chambre) => chambre.hotelManager)
   chambres: Chambre[];
@@ -13,4 +13,6 @@ export class HotelManager extends User {  //تأكد من وجود export
   @OneToMany(() => Reservation, (reservation) => reservation.hotelManager)
   reservations: Reservation[];
 
+  @OneToMany(() => Hotel, (hotel) => hotel.hotelManager)
+  hotels: Hotel[];
 }

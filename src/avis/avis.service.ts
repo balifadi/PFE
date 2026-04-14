@@ -1,7 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+
 import { Avis } from '../entities/avis.entity';
+import { CreateAvisDto } from './dto/create-avis.dto';
+import { UpdateAvisDto } from './dto/update-avis.dto';
 
 @Injectable()
 export class AvisService {
@@ -11,42 +18,111 @@ export class AvisService {
     private avisRepository: Repository<Avis>,
   ) {}
 
-  // créer avis
-  async create(avis: Partial<Avis>): Promise<Avis> {
-    const newAvis = this.avisRepository.create(avis);
-    return this.avisRepository.save(newAvis);
+  // ===== CREATE =====
+  async create(dto: CreateAvisDto, clientId: number): Promise<Avis> {
+
+    if (!['hotel', 'zone', 'agence'].includes(dto.type)) {
+      throw new NotFoundException('Type invalide');
+    }
+
+    const avis = this.avisRepository.create({
+      type: dto.type,
+      note: dto.note,
+      commentaire: dto.commentaire,
+      targetId: dto.targetId,
+      client: { iduser: clientId } as any,
+      date_Avis: new Date(),
+    });
+
+    return this.avisRepository.save(avis);
   }
 
-  // afficher tous les avis
-  async findAll(): Promise<Avis[]> {
-    return this.avisRepository.find({ relations: ['admin', 'client'], order: { date_Avis: 'DESC' } });
-  }
-
-  // afficher avis par id
-  async findOne(id: number): Promise<Avis | null> {
-    return this.avisRepository.findOne({
-      where: { idavis: id },
-      relations: ['admin', 'client'],
+  // ===== PUBLIC FIND ALL =====
+  async findAllPublic(): Promise<Avis[]> {
+    return this.avisRepository.find({
+      relations: ['client'],
+      order: { date_Avis: 'DESC' },
     });
   }
 
-  // mettre à jour avis
-  async update(id: number, data: Partial<Avis>) {
-    await this.avisRepository.update(id, data);
-    return this.findOne(id);
+  // ===== FIND ONE =====
+  async findOne(id: number, userId: number, role: string): Promise<Avis> {
+
+    const avis = await this.avisRepository.findOne({
+      where: { idavis: id },
+      relations: ['client', 'admin'],
+    });
+
+    if (!avis) throw new NotFoundException('Avis non trouvé');
+
+    return avis;
   }
 
-  // supprimer avis
-  async remove(id: number) {
+  // ===== UPDATE =====
+  async update(id: number, userId: number, dto: UpdateAvisDto): Promise<Avis> {
+
+    const avis = await this.avisRepository.findOne({
+      where: { idavis: id },
+      relations: ['client'],
+    });
+
+    if (!avis) throw new NotFoundException('Avis non trouvé');
+
+    if (avis.client.iduser !== userId) {
+      throw new ForbiddenException("Vous ne pouvez modifier que votre avis");
+    }
+
+    Object.assign(avis, dto);
+
+    return this.avisRepository.save(avis);
+  }
+
+  // ===== DELETE =====
+  async remove(id: number, userId: number, role: string) {
+
+    const avis = await this.avisRepository.findOne({
+      where: { idavis: id },
+      relations: ['client'],
+    });
+
+    if (!avis) throw new NotFoundException('Avis non trouvé');
+
+    if (role === 'client' && avis.client.iduser !== userId) {
+      throw new ForbiddenException("Accès refusé");
+    }
+
     return this.avisRepository.delete(id);
   }
 
-  // consulter avis par type (zone, hotel, agence)
+  // ===== FILTER BY TYPE =====
   async consulterParType(type: string): Promise<Avis[]> {
     return this.avisRepository.find({
       where: { type },
-      relations: ['admin', 'client'],
-      order: { date_Avis: 'DESC' }
+      relations: ['client', 'admin'],
+      order: { date_Avis: 'DESC' },
     });
+  }
+
+  // ===== FILTER BY TARGET =====
+  async getAvisByTarget(type: string, targetId: number): Promise<Avis[]> {
+    return this.avisRepository.find({
+      where: { type, targetId },
+      relations: ['client'],
+      order: { date_Avis: 'DESC' },
+    });
+  }
+
+  // ===== AVERAGE RATING =====
+  async getAverageRating(type: string, targetId: number): Promise<number> {
+
+    const avis = await this.avisRepository.find({
+      where: { type, targetId },
+    });
+
+    if (avis.length === 0) return 0;
+
+    const total = avis.reduce((sum, a) => sum + Number(a.note), 0);
+
+    return Number((total / avis.length).toFixed(2));
   }
 }

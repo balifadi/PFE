@@ -1,87 +1,101 @@
 import {
-  Controller, Get, Param, Delete, Put,
-  Body, ParseIntPipe, UseGuards
+  Controller, Get, UseGuards, Request
 } from '@nestjs/common';
-
 import { ClientService } from './client.service';
-import { Client } from '../entities/client.entity';
-
-import {
-  ApiTags, ApiParam, ApiBody,
-  ApiResponse, ApiBearerAuth
-} from '@nestjs/swagger';
-
+import { ApiTags, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @ApiTags('Clients')
 @Controller('clients')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth()
 export class ClientController {
 
   constructor(private readonly clientService: ClientService) {}
 
-  // ================= GET ALL =================
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  // ===============================
+  // ✅ ADMIN → GET ALL CLIENTS
+  // ===============================
   @Get()
-  @ApiResponse({ status: 200, description: 'Liste des clients' })
-  findAll() {
-    return this.clientService.findAll();
+  @Roles('admin')
+  @ApiResponse({ status: 200, description: 'Get all clients (admin only)' })
+  findAll(@Request() req: any) {
+    return this.clientService.findAll(req.user);
   }
 
-  // ================= GET ONE =================
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @Get(':id')
-  @ApiParam({
-    name: 'id',
-    type: Number,
-    example: 1,
-    description: 'ID du Client',
+  // ===============================
+  // ✅ CLIENT ACCOUNT (via JWT)
+  // ===============================
+
+  @Get('profile')
+  @Roles('client')
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Profil du client connecté (via token JWT)' 
   })
-  @ApiResponse({ status: 200, description: 'Client trouvé' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.clientService.findOne(id);
+  getProfile(@Request() req: any) {
+    return this.clientService.getProfile(req.user.iduser);
   }
 
-  // ================= UPDATE =================
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @Put(':id')
-  @ApiParam({
-    name: 'id',
-    type: Number,
-    example: 1,
+  @Get('reservations')
+  @Roles('client')
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Réservations du client connecté' 
   })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        nom: { type: 'string', example: 'Fedi' },
-        email: { type: 'string', example: 'fedi@gmail.com' },
-        password: { type: 'string', example: '934456' },
-        telephone: { type: 'string', example: '22774455' }
-      }
-    }
-  })
-  @ApiResponse({ status: 200, description: 'Client updated' })
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() data: Partial<Client>,
-  ) {
-    return this.clientService.update(id, data);
+  getReservations(@Request() req: any) {
+    return this.clientService.getReservations(req.user.iduser);
   }
 
-  // ================= DELETE =================
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @Delete(':id')
-  @ApiParam({
-    name: 'id',
-    type: Number,
-    example: 1,
+  @Get('locations')
+  @Roles('client')
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Locations du client connecté' 
   })
-  @ApiResponse({ status: 200, description: 'Client deleted' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.clientService.remove(id);
+  getLocations(@Request() req: any) {
+    return this.clientService.getLocations(req.user.iduser);
+  }
+
+  @Get('favoris')
+  @Roles('client')
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Favoris du client connecté' 
+  })
+  getFavoris(@Request() req: any) {
+    return this.clientService.getFavoris(req.user.iduser);
+  }
+
+  @Get('notifications')
+  @Roles('client')
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Notifications du client connecté' 
+  })
+  getNotifications(@Request() req: any) {
+    return this.clientService.getNotifications(req.user.iduser);
+  }
+
+  @Get('avis')
+  @Roles('client')
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Avis du client connecté' 
+  })
+  getAvis(@Request() req: any) {
+    return this.clientService.getAvis(req.user.iduser);
+  }
+
+  @Get('factures')
+  @Roles('client')
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Factures du client connecté' 
+  })
+  getFactures(@Request() req: any) {
+    return this.clientService.getFactures(req.user.iduser);
   }
 }

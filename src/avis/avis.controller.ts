@@ -1,16 +1,31 @@
 import {
-  Controller, Get, Post, Body, Param,
-  Delete, Put, ParseIntPipe
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Delete,
+  Put,
+  ParseIntPipe,
+  UseGuards,
+  Request
 } from '@nestjs/common';
 
 import { AvisService } from './avis.service';
-import { Avis } from '../entities/avis.entity';
+
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+
+import { CreateAvisDto } from './dto/create-avis.dto';
+import { UpdateAvisDto } from './dto/update-avis.dto';
 
 import {
   ApiTags,
-  ApiParam,
+  ApiBearerAuth,
+  ApiOperation,
   ApiBody,
-  ApiResponse
+  ApiParam
 } from '@nestjs/swagger';
 
 @ApiTags('Avis')
@@ -19,143 +34,91 @@ export class AvisController {
 
   constructor(private readonly avisService: AvisService) {}
 
-  // ===============================
-  // créer avis (client)
-  // ===============================
-  @Post(':clientId')
-
-  @ApiParam({
-    name: 'clientId',
-    type: Number,
-    example: 1
-  })
-
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        type: { type: 'string', example: 'hotel' },
-        note: { type: 'number', example: 4 },
-        commentaire: { type: 'string', example: 'Très bon service' }
-      },
-      required: ['type', 'note']
-    }
-  })
-
-  @ApiResponse({ status: 201, description: 'Avis créé avec succès' })
-  @ApiResponse({ status: 400, description: 'Erreur lors de création' })
-
-  create(
-    @Body() avis: Partial<Avis>,
-    @Param('clientId', ParseIntPipe) clientId: number,
-  ) {
-    // 🔥 نربط client
-    avis.client = { iduser: clientId } as any;
-
-    return this.avisService.create(avis);
+  // ===== CREATE =====
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('client')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Créer un avis' })
+  @ApiBody({ type: CreateAvisDto })
+  create(@Body() dto: CreateAvisDto, @Request() req: any) {
+    return this.avisService.create(dto, req.user.iduser);
   }
 
-  // ===============================
-  // afficher tous les avis
-  // ===============================
-  @Get()
-
-  @ApiResponse({ status: 200, description: 'Liste des avis' })
-
-  findAll() {
-    return this.avisService.findAll();
+  // ===== PUBLIC =====
+  @Get('public')
+  @ApiOperation({ summary: 'Lister tous les avis (public)' })
+  findAllPublic() {
+    return this.avisService.findAllPublic();
   }
 
-  // ===============================
-  // afficher avis par id
-  // ===============================
+  // ===== GET ONE =====
   @Get(':id')
-
-  @ApiParam({
-    name: 'id',
-    type: Number,
-    example: 1
-  })
-
-  @ApiResponse({ status: 200, description: 'Avis trouvé' })
-  @ApiResponse({ status: 404, description: 'Avis non trouvé' })
-
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.avisService.findOne(id);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'client', 'hotel-manager', 'agence-manager')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Afficher un avis' })
+  @ApiParam({ name: 'id', example: 1 })
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.avisService.findOne(id, req.user.iduser, req.user.role);
   }
 
-  // ===============================
-  // modifier avis (client ou admin)
-  // ===============================
-  @Put(':id/:clientId')
-
-  @ApiParam({
-    name: 'id',
-    type: Number,
-    example: 1
-  })
-
-  @ApiParam({
-    name: 'clientId',
-    type: Number,
-    example: 1
-  })
-
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        type: { type: 'string', example: 'hotel' },
-        note: { type: 'number', example: 5 },
-        commentaire: { type: 'string', example: 'Service ممتاز' }
-      }
-    }
-  })
-
-  @ApiResponse({ status: 200, description: 'Avis mis à jour' })
-
+  // ===== UPDATE =====
+  @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('client')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Modifier un avis' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: UpdateAvisDto })
   update(
     @Param('id', ParseIntPipe) id: number,
-    @Param('clientId', ParseIntPipe) clientId: number,
-    @Body() data: Partial<Avis>
+    @Body() dto: UpdateAvisDto,
+    @Request() req: any
   ) {
-    // نأكد الربط بالclient
-    data.client = { iduser: clientId } as any;
-
-    return this.avisService.update(id, data);
+    return this.avisService.update(id, req.user.iduser, dto);
   }
 
-  // ===============================
-  // supprimer avis
-  // ===============================
+  // ===== DELETE =====
   @Delete(':id')
-
-  @ApiParam({
-    name: 'id',
-    type: Number,
-    example: 1
-  })
-
-  @ApiResponse({ status: 200, description: 'Avis supprimé' })
-
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.avisService.remove(id);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'client')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Supprimer un avis' })
+  @ApiParam({ name: 'id', example: 1 })
+  remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.avisService.remove(id, req.user.iduser, req.user.role);
   }
 
-  // ===============================
-  // consulter avis par type
-  // ===============================
-  @Get('type/:type')
 
-  @ApiParam({
-    name: 'type',
-    type: String,
-    example: 'hotel'
-  })
-
-  @ApiResponse({ status: 200, description: 'Avis filtrés par type' })
-
-  consulterParType(@Param('type') type: string) {
+  // ===== PUBLIC FILTER =====
+  @Get('public/type/:type')
+  @ApiOperation({ summary: 'Filtrer par type (public)' })
+  consulterParTypePublic(@Param('type') type: string) {
     return this.avisService.consulterParType(type);
+  }
+
+  // ===== BY TARGET =====
+  @Get('target/:type/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'client', 'hotel-manager', 'agence-manager')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Avis par cible' })
+  getByTarget(
+    @Param('type') type: string,
+    @Param('id', ParseIntPipe) id: number
+  ) {
+    return this.avisService.getAvisByTarget(type, id);
+  }
+
+
+  // ===== PUBLIC AVERAGE =====
+  @Get('public/average/:type/:id')
+  @ApiOperation({ summary: 'Note moyenne (public)' })
+  getAveragePublic(
+    @Param('type') type: string,
+    @Param('id', ParseIntPipe) id: number
+  ) {
+    return this.avisService.getAverageRating(type, id);
   }
 }
