@@ -46,4 +46,4 @@ export class Hotel {
 
   @OneToMany(() => Chambre, (chambre) => chambre.hotel)
   chambres: Chambre[];
-}
+} 

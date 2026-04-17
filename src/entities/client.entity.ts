@@ -16,8 +16,8 @@ export class Client extends User {
   @OneToMany(() => Location, (location) => location.client)
   locations: Location[];
 
-  @OneToOne(() => Facture, (facture) => facture.client)
-  facture: Facture;
+  @OneToMany(() => Facture, (facture) => facture.client)
+  factures: Facture[];   // ← tableau obligatoire avec OneToMany
 
   @OneToMany(() => Notification, (notification) => notification.client)
   notifications: Notification[];

@@ -20,7 +20,13 @@ export class ClientService {
     }
 
     return this.clientRepository.find({
-      relations: ['reservations', 'locations', 'facture', 'notifications', 'avis'],
+      relations: [
+        'reservations',
+        'locations',
+        'factures', // ✅ corrigé
+        'notifications',
+        'avis',
+      ],
     });
   }
 
@@ -31,7 +37,14 @@ export class ClientService {
   async getProfile(clientId: number) {
     const client = await this.clientRepository.findOne({
       where: { iduser: clientId },
-      relations: ['reservations', 'locations', 'favoris', 'notifications', 'avis', 'facture'],
+      relations: [
+        'reservations',
+        'locations',
+        'favoris',
+        'notifications',
+        'avis',
+        'factures', // ✅ corrigé
+      ],
     });
 
     if (!client) {
@@ -82,6 +95,7 @@ export class ClientService {
       where: { iduser: clientId },
       relations: ['avis'],
     });
+    
 
     return client?.avis || [];
   }
@@ -89,9 +103,9 @@ export class ClientService {
   async getFactures(clientId: number) {
     const client = await this.clientRepository.findOne({
       where: { iduser: clientId },
-      relations: ['facture'],
+      relations: ['factures'], // ✅ corrigé
     });
 
-    return client?.facture || [];
+    return client?.factures || []; // ✅ corrigé
   }
 }

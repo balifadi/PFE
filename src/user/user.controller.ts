@@ -2,6 +2,7 @@ import {
   Controller, Get, Post, Body, Param, Delete, Put,
   Request, UseGuards, ParseIntPipe, UsePipes, ValidationPipe
 } from '@nestjs/common';
+
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -26,7 +27,12 @@ export class UserController {
   async register(@Body() createUserDto: CreateUserDto): Promise<LoginResponseDto> {
     const user = await this.userService.register(createUserDto);
     const access_token = this.userService.generateToken(user as any);
-    return { ...user, access_token, role: user.role as 'admin' | 'client' | 'hotel-manager' | 'agence-manager' };
+
+    return {
+      ...user,
+      access_token,
+      role: user.role as 'admin' | 'client' | 'hotel-manager' | 'agence-manager',
+    };
   }
 
   // ================= LOGIN =================
@@ -38,13 +44,27 @@ export class UserController {
     return this.userService.login(loginUserDto);
   }
 
+  // ================= PROFILE =================
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('profile')
+  getProfile(@Request() req: any) {
+    return this.userService.findOne(req.user.iduser, req.user);
+  }
 
-  // ================= ADMIN ONLY =================
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Put('profile')
+  updateProfile(@Request() req: any, @Body() dto: UpdateUserDto) {
+    return this.userService.updateProfile(req.user.iduser, dto);
+  }
+
+  // ================= ADMIN =================
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
   @Get()
-  async findAll(@Request() req: any) {
+  findAll(@Request() req: any) {
     return this.userService.findAll(req.user);
   }
 
@@ -52,7 +72,7 @@ export class UserController {
   @Roles('admin')
   @ApiBearerAuth()
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.userService.findOne(id, req.user);
   }
 
@@ -60,7 +80,11 @@ export class UserController {
   @Roles('admin')
   @ApiBearerAuth()
   @Put(':id')
-  async update(@Param('id', ParseIntPipe) id: number, @Body() updateUserDto: UpdateUserDto, @Request() req: any) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateUserDto: UpdateUserDto,
+    @Request() req: any
+  ) {
     return this.userService.update(id, updateUserDto, req.user);
   }
 
@@ -68,25 +92,28 @@ export class UserController {
   @Roles('admin')
   @ApiBearerAuth()
   @Delete(':id')
-  async remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+  remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.userService.remove(id, req.user);
   }
 
-  // ================= GET USERS BY ROLE =================
+  // ================= ROLE =================
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
   @Get('role/:role')
-  async getUsersByRole(@Param('role') role: string, @Request() req: any) {
+  getUsersByRole(@Param('role') role: string, @Request() req: any) {
     return this.userService.findUsersByRole(role, req.user);
   }
 
-  // ================= GET SINGLE USER BY ROLE AND ID =================
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth()
   @Get('role/:role/:id')
-  async getUserByRoleAndId(@Param('role') role: string, @Param('id', ParseIntPipe) id: number, @Request() req: any) {
+  getUserByRoleAndId(
+    @Param('role') role: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any
+  ) {
     return this.userService.findUserByRoleAndId(role, id, req.user);
   }
 }

@@ -19,7 +19,7 @@ export class Reservation {
   @Column()
   statut: string;
 
-  @ManyToOne(() => Client, (client) => client.reservations)
+  @ManyToOne(() => Client, (client) => client.reservations) 
   client: Client;
 
   @ManyToOne(() => HotelManager, (manager) => manager.reservations)
@@ -28,7 +28,7 @@ export class Reservation {
   @OneToMany(() => Chambre, (chambre) => chambre.reservation)
   chambres: Chambre[];
 
-  @OneToOne(() => Facture, (facture) => facture.reservation)
-  facture: Facture;
+  @OneToOne(() => Facture, (facture) => facture.reservation, { nullable: true })
+  facture?: Facture;
 
 }

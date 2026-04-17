@@ -1,7 +1,7 @@
-import {
-  Injectable,
-  ForbiddenException,
-  NotFoundException,
+ import {
+Injectable,
+ForbiddenException,
+NotFoundException,
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
@@ -18,118 +18,117 @@ import { UpdateHotelDto } from './dto/update-hotel.dto';
 @Injectable()
 export class HotelService {
 
-  constructor(
-    @InjectRepository(Hotel)
-    private hotelRepository: Repository<Hotel>,
+constructor(
+@InjectRepository(Hotel)
+private hotelRepository: Repository<Hotel>,
 
-    @InjectRepository(Admin)
-    private adminRepository: Repository<Admin>,
+@InjectRepository(Admin)  
+private adminRepository: Repository<Admin>,  
 
-    @InjectRepository(Client)
-    private clientRepository: Repository<Client>,
+@InjectRepository(Client)  
+private clientRepository: Repository<Client>,  
 
-    private notificationService: NotificationService,
-  ) {}
+private notificationService: NotificationService,
 
-  async create(dto: CreateHotelDto, adminId: number): Promise<Hotel> {
+) {}
 
-    const admin = await this.adminRepository.findOne({
-      where: { iduser: adminId },
-    });
+async create(dto: CreateHotelDto, adminId: number): Promise<Hotel> {
 
-    if (!admin) throw new NotFoundException('Admin non trouve');
+const admin = await this.adminRepository.findOne({  
+  where: { iduser: adminId },  
+});  
 
-    const hotel = this.hotelRepository.create({
-      ...dto,
-      admin,
-    });
+if (!admin) throw new NotFoundException('Admin non trouve');  
 
-    const saved = await this.hotelRepository.save(hotel);
+const hotel = this.hotelRepository.create({  
+  ...dto,  
+  admin,  
+});  
 
-    const clients = await this.clientRepository.find();
+const saved = await this.hotelRepository.save(hotel);  
 
-    for (const client of clients) {
-      await this.notificationService.create({
-        clientId: client.iduser,
-        message: 'Nouvel hotel ajoute : ' + saved.nom,
-        type: 'hotel',
-        senderRole: 'admin',
-        senderId: adminId,
-      });
-    }
+const clients = await this.clientRepository.find();  
 
-    return saved;
-  }
+for (const client of clients) {  
+  await this.notificationService.create({  
+    clientId: client.iduser,  
+    message: 'Nouvel hotel ajoute : ' + saved.nom,  
+    type: 'hotel',  
+    senderRole: 'admin',  
+    senderId: adminId,  
+  });  
+}  
 
-  async findAll(userId: number, role: string): Promise<Hotel[]> {
+return saved;
 
-    if (role === 'admin' || role === 'client') {
-      return this.hotelRepository.find({
-        relations: ['admin', 'chambres', 'hotelManager'],
-      });
-    }
-
-    if (role === 'hotel-manager') {
-      return this.hotelRepository.find({
-        where: { hotelManager: { iduser: userId } },
-        relations: ['admin', 'chambres', 'hotelManager'],
-      });
-    }
-
-    throw new ForbiddenException('Acces refuse');
-  }
-
-
-  // ================= GET LOCALISATION PUBLIC (visiteurs) =================
-async getLocalisationPublic() {
-  const hotels = await this.hotelRepository.find({
-    select: ['idhotel', 'nom', 'latitude', 'longitude'],
-  });
-
-  return hotels.map(h => ({
-    id: h.idhotel,
-    nom: h.nom,
-    latitude: h.latitude,
-    longitude: h.longitude,
-  }));
 }
 
+async findAll(userId: number, role: string): Promise<Hotel[]> {
 
+if (role === 'admin' || role === 'client') {  
+  return this.hotelRepository.find({  
+    relations: ['admin', 'chambres', 'hotelManager'],  
+  });  
+}  
 
-  async findOneByUser(id: number, userId: number, role: string): Promise<Hotel> {
+if (role === 'hotel-manager') {  
+  return this.hotelRepository.find({  
+    where: { hotelManager: { iduser: userId } },  
+    relations: ['admin', 'chambres', 'hotelManager'],  
+  });  
+}  
 
-    const hotel = await this.hotelRepository.findOne({
-      where: { idhotel: id },
-      relations: ['admin', 'chambres', 'hotelManager'],
-    });
+throw new ForbiddenException('Acces refuse');
 
-    if (!hotel) throw new NotFoundException('Hotel non trouve');
+}
 
-    if (role === 'hotel-manager' && hotel.hotelManager?.iduser !== userId) {
-      throw new ForbiddenException('Acces refuse');
-    }
+// ================= GET LOCALISATION PUBLIC (visiteurs) =================
+async getLocalisationPublic() {
+const hotels = await this.hotelRepository.find({
+select: ['idhotel', 'nom', 'latitude', 'longitude'],
+});
 
-    return hotel;
-  }
+return hotels.map(h => ({
+id: h.idhotel,
+nom: h.nom,
+latitude: h.latitude,
+longitude: h.longitude,
+}));
+}
 
-  async update(id: number, dto: UpdateHotelDto): Promise<Hotel> {
+async findOneByUser(id: number, userId: number, role: string): Promise<Hotel> {
 
-    await this.hotelRepository.update(id, dto);
+const hotel = await this.hotelRepository.findOne({  
+  where: { idhotel: id },  
+  relations: ['admin', 'chambres', 'hotelManager'],  
+});  
 
-    const updated = await this.hotelRepository.findOne({
-      where: { idhotel: id },
-      relations: ['admin', 'chambres', 'hotelManager'],
-    });
+if (!hotel) throw new NotFoundException('Hotel non trouve');  
 
-    if (!updated) throw new NotFoundException('Hotel non trouve');
+if (role === 'hotel-manager' && hotel.hotelManager?.iduser !== userId) {  
+  throw new ForbiddenException('Acces refuse');  
+}  
 
-    return updated;
-  }
+return hotel;
 
-  async remove(id: number) {
-    return this.hotelRepository.delete(id);
-  }
+}
 
-  
+async update(id: number, dto: UpdateHotelDto): Promise<Hotel> {
 
+await this.hotelRepository.update(id, dto);  
+
+const updated = await this.hotelRepository.findOne({  
+  where: { idhotel: id },  
+  relations: ['admin', 'chambres', 'hotelManager'],  
+});  
+
+if (!updated) throw new NotFoundException('Hotel non trouve');  
+
+return updated;
+
+}
+
+async remove(id: number) {
+return this.hotelRepository.delete(id);
+}
 }

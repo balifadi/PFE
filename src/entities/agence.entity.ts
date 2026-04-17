@@ -27,10 +27,9 @@ export class Agence {
   @ManyToOne(() => Admin, (admin) => admin.agences)
   admin: Admin;
 
-  // 🔥 relation ajoutée مع AgenceManager
   @ManyToOne(() => AgenceManager, (manager) => manager.agences, { nullable: true })
   agenceManager: AgenceManager;
 
   @OneToMany(() => Voiture, (voiture) => voiture.agence)
   voitures: Voiture[];
-}
+}                        

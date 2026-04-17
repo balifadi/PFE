@@ -19,7 +19,9 @@ export class Location {
   @Column()
   statut: string;
 
-  @ManyToOne(() => Client, (client) => client.locations)
+  @ManyToOne(() => Client, (client) => client.locations,{
+    onDelete: 'SET NULL'
+  })
   client: Client;
 
   @ManyToOne(() => AgenceManager, (manager) => manager.locations)
@@ -29,7 +31,8 @@ export class Location {
   @JoinColumn()
   voiture: Voiture;
 
-  @OneToOne(() => Facture, (facture) => facture.location)
-  facture: Facture;
+  @OneToOne(() => Facture, (facture) => facture.location, { nullable: true })
+  facture?: Facture;
+
 
 }

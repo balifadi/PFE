@@ -26,4 +26,4 @@ export class Notification {
   @ManyToOne(() => Client, (client) => client.notifications, { nullable: true })
   client: Client;
 
-}  
+}

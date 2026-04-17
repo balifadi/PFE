@@ -24,10 +24,12 @@ export class Chambre {
   @ManyToOne(() => HotelManager, (manager) => manager.chambres)
   hotelManager: HotelManager;
 
-  @ManyToOne(() => Hotel, (hotel) => hotel.chambres)
+  @ManyToOne(() => Hotel, (hotel) => hotel.chambres, {
+     onDelete: 'CASCADE'
+  })
   hotel: Hotel;
 
   @ManyToOne(() => Reservation, (reservation) => reservation.chambres)
   reservation: Reservation;
 
-}
+}                            

@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToOne, JoinColumn } from 'typeorm';
 import { Client } from './client.entity';
 import { Reservation } from './reservation.entity';
 import { Location } from './location.entity';
@@ -21,18 +21,18 @@ export class Facture {
   @Column({ default: 'non payée' })
   statut: string;
 
-  // Facture liée à un client (toujours obligatoire)
-  @OneToOne(() => Client, (client) => client.facture)
-  @JoinColumn()
+  // ✅ Un client peut avoir plusieurs factures
+  @ManyToOne(() => Client, (client) => client.factures, { nullable: false })
+  @JoinColumn({ name: 'clientId' })
   client: Client;
 
-  // Facture liée à une réservation (اختيارية)
-  @OneToOne(() => Reservation, (reservation) => reservation.facture, { nullable: true })
-  @JoinColumn()
+  // ✅ Facture liée à une réservation (optionnelle)
+  @OneToOne(() => Reservation, (reservation) => reservation.facture, { nullable: true, eager: false })
+  @JoinColumn({ name: 'reservationId' })
   reservation?: Reservation;
 
-  // Facture liée à une location (اختيارية)
-  @OneToOne(() => Location, (location) => location.facture, { nullable: true })
-  @JoinColumn()
+  // ✅ Facture liée à une location (optionnelle)
+  @OneToOne(() => Location, (location) => location.facture, { nullable: true, eager: false })
+  @JoinColumn({ name: 'locationId' })
   location?: Location;
 }

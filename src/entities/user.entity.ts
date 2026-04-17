@@ -14,13 +14,20 @@ export class User {
   @Column()
   nom: string;
 
+  // ✅ AJOUT
+  @Column()
+  prenom: string;
+
   @Column({ unique: true })
   email: string;
 
   @Column()
   password: string;
 
-  // ✅ SOLUTION : Ajouter @Column avec le nom exact de la colonne BDD
+  // ✅ AJOUT
+  @Column()
+  telephone: string;
+
   @Column({ name: 'role' })
   role: string;
 }

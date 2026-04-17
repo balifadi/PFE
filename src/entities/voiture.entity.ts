@@ -27,10 +27,12 @@ export class Voiture {
   @ManyToOne(() => AgenceManager, (manager) => manager.voitures)
   agenceManager: AgenceManager;
 
-  @ManyToOne(() => Agence, (agence) => agence.voitures)
+  @ManyToOne(() => Agence, (agence) => agence.voitures, {
+  onDelete: 'CASCADE'
+  })
   agence: Agence;
 
   @OneToOne(() => Location, (location) => location.voiture)
   location: Location;
 
-}
+}                        

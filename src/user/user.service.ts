@@ -15,6 +15,7 @@ import { LoginResponseDto } from './dto/login-response.dto';
 
 @Injectable()
 export class UserService {
+
   private allowedRoles = ['admin', 'client', 'hotel-manager', 'agence-manager'];
 
   constructor(
@@ -22,47 +23,43 @@ export class UserService {
     private userRepository: Repository<User>,
 
     @InjectRepository(Admin)
-    private adminRepository: Repository<Admin>,       // ✅ Ajouté
+    private adminRepository: Repository<Admin>,
 
     @InjectRepository(Client)
-    private clientRepository: Repository<Client>,     // ✅ Ajouté
+    private clientRepository: Repository<Client>,
 
     @InjectRepository(HotelManager)
-    private hotelManagerRepository: Repository<HotelManager>, // ✅ Ajouté
+    private hotelManagerRepository: Repository<HotelManager>,
 
     @InjectRepository(AgenceManager)
-    private agenceManagerRepository: Repository<AgenceManager>, // ✅ Ajouté
+    private agenceManagerRepository: Repository<AgenceManager>,
 
     private jwtService: JwtService,
   ) {}
 
   // ================= REGISTER =================
   async register(createUserDto: CreateUserDto): Promise<any> {
-    const { nom, email, password, role } = createUserDto;
 
-    if (!this.allowedRoles.includes(role)) throw new ForbiddenException('Rôle invalide');
+    const { nom, prenom, email, password, telephone, role } = createUserDto;
 
-    if (!nom || !/^[A-Za-z][A-Za-z ]*$/.test(nom)) {
-      throw new ForbiddenException('Le nom ne doit pas être vide, ne doit pas commencer par un chiffre');
-    }
-
-    if (!email || !/^[A-Za-z][A-Za-z0-9._%+-]*@[A-Za-z0-9.-]+.(com|net|org)$/.test(email)) {
-      throw new ForbiddenException('Email invalide');
-    }
-
-    if (!password || !/^[A-Za-z0-9]+$/.test(password)) {
-      throw new ForbiddenException('Le mot de passe doit contenir uniquement lettres et chiffres');
-    }
+    if (!this.allowedRoles.includes(role))
+      throw new ForbiddenException('Rôle invalide');
 
     const existingUser = await this.userRepository.findOne({ where: { email } });
     if (existingUser) throw new ForbiddenException('Email déjà utilisé');
 
     const hash = await bcrypt.hash(password, 10);
-    const data = { nom, email, password: hash };
+
+    const data = {
+      nom,
+      prenom,
+      email,
+      password: hash,
+      telephone
+    };
 
     let savedUser: any;
 
-    // ✅ Chaque rôle utilise son propre repository → TypeORM stocke la bonne valeur dans 'role'
     switch (role) {
       case 'admin':
         savedUser = await this.adminRepository.save(this.adminRepository.create(data));
@@ -82,7 +79,7 @@ export class UserService {
     return result;
   }
 
-  // ================= VALIDATE =================
+  // ================= LOGIN =================
   async validateUser(email: string, password: string): Promise<User> {
     const user = await this.userRepository.findOne({ where: { email } });
     if (!user) throw new UnauthorizedException('User not found');
@@ -93,66 +90,111 @@ export class UserService {
     return user;
   }
 
-  // ================= LOGIN =================
   generateToken(user: User): string {
-    const payload = { sub: user.iduser, email: user.email, role: user.role };
-    return this.jwtService.sign(payload);
+    return this.jwtService.sign({
+      sub: user.iduser,
+      email: user.email,
+      role: user.role
+    });
   }
 
   async login(loginUserDto: LoginUserDto): Promise<LoginResponseDto> {
     const user = await this.validateUser(loginUserDto.email, loginUserDto.password);
-    const access_token = this.generateToken(user);
+
     return {
-      access_token,
+      access_token: this.generateToken(user),
       nom: user.nom,
+      prenom: (user as any).prenom,
       email: user.email,
+      telephone: (user as any).telephone,
       role: user.role as any,
     };
   }
 
-  // ================= ADMIN ONLY =================
+  // ================= PROFILE UPDATE =================
+  async updateProfile(userId: number, updateUserDto: UpdateUserDto) {
+
+    const user = await this.userRepository.findOneBy({ iduser: userId });
+    if (!user) throw new NotFoundException('User not found');
+
+    delete updateUserDto.role;
+
+    if (updateUserDto.password) {
+      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
+    }
+
+    await this.userRepository.update(userId, updateUserDto);
+
+    return {
+      message: 'Profil mis à jour avec succès'
+    };
+  }
+
+  // ================= ADMIN =================
   async findAll(currentUser: User): Promise<User[]> {
-    if (currentUser.role !== 'admin') throw new ForbiddenException('Admins only');
+    if (currentUser.role !== 'admin')
+      throw new ForbiddenException('Admins only');
+
     return this.userRepository.find();
   }
 
   async findOne(id: number, currentUser: User): Promise<User | null> {
-    if (currentUser.role !== 'admin') throw new ForbiddenException('Admins only');
     const user = await this.userRepository.findOneBy({ iduser: id });
     if (!user) throw new NotFoundException('User not found');
+
     return user;
   }
 
   async update(id: number, updateUserDto: UpdateUserDto, currentUser: User) {
-    if (currentUser.role !== 'admin') throw new ForbiddenException('Admins only');
-    if (updateUserDto.role && !this.allowedRoles.includes(updateUserDto.role)) {
-      throw new ForbiddenException('Rôle invalide');
-    }
+    if (currentUser.role !== 'admin')
+      throw new ForbiddenException('Admins only');
+
     if (updateUserDto.password) {
-      if (!/^[A-Za-z0-9]+$/.test(updateUserDto.password)) {
-        throw new ForbiddenException('Le mot de passe doit contenir uniquement lettres et chiffres');
-      }
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
+
     return this.userRepository.update(id, updateUserDto);
   }
 
   async remove(id: number, currentUser: User) {
-    if (currentUser.role !== 'admin') throw new ForbiddenException('Admins only');
-    return this.userRepository.delete(id);
+    if (currentUser.role !== 'admin')
+      throw new ForbiddenException('Admins only');
+
+    const user = await this.userRepository.findOneBy({ iduser: id });
+    if (!user) throw new NotFoundException('User not found');
+
+    switch (user.role) {
+      case 'admin':
+        await this.adminRepository.delete(id);
+        break;
+      case 'client':
+        await this.clientRepository.delete(id);
+        break;
+      case 'hotel-manager':
+        await this.hotelManagerRepository.delete(id);
+        break;
+      case 'agence-manager':
+        await this.agenceManagerRepository.delete(id);
+        break;
+    }
+
+    return { message: 'Deleted successfully' };
   }
 
   async findUsersByRole(role: string, currentUser: User): Promise<User[]> {
-    if (currentUser.role !== 'admin') throw new ForbiddenException('Admins only');
-    if (!this.allowedRoles.includes(role)) throw new ForbiddenException('Rôle invalide');
+    if (currentUser.role !== 'admin')
+      throw new ForbiddenException('Admins only');
+
     return this.userRepository.find({ where: { role } });
   }
 
   async findUserByRoleAndId(role: string, id: number, currentUser: User): Promise<User> {
-    if (currentUser.role !== 'admin') throw new ForbiddenException('Admins only');
-    if (!this.allowedRoles.includes(role)) throw new ForbiddenException('Rôle invalide');
+    if (currentUser.role !== 'admin')
+      throw new ForbiddenException('Admins only');
+
     const user = await this.userRepository.findOne({ where: { iduser: id, role } });
     if (!user) throw new NotFoundException('User not found');
+
     return user;
   }
 }

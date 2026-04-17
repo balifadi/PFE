@@ -69,7 +69,7 @@ import { FavorisModule } from './favoris/favoris.module';
         Notification,
         Favoris,
       ],
-      synchronize: true,
+      synchronize: false,
     }),
 
     // Modules

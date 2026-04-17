@@ -24,6 +24,6 @@ export class Favoris {
   @Column()
   targetId: number;
 
-  @ManyToOne(() => Client, (client) => client.favoris, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Client, (client) => client.favoris)
   client: Client;
 }
