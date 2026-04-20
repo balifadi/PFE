@@ -19,6 +19,8 @@ import { Agence } from './entities/agence.entity';
 import { Avis } from './entities/avis.entity';
 import { Notification } from './entities/notification.entity';
 import { Favoris } from './entities/favoris.entity';
+import { Contact } from './entities/contact.entity';
+
 
 // Modules
 import { UserModule } from './user/user.module';
@@ -37,6 +39,7 @@ import { AgenceModule } from './agence/agence.module';
 import { AvisModule } from './avis/avis.module';
 import { NotificationModule } from './notification/notification.module';
 import { FavorisModule } from './favoris/favoris.module';
+import { ContactModule } from './contact/contact.module';
 
 @Module({
   imports: [
@@ -68,8 +71,9 @@ import { FavorisModule } from './favoris/favoris.module';
         Avis,
         Notification,
         Favoris,
+        Contact
       ],
-      synchronize: false,
+      synchronize: true,
     }),
 
     // Modules
@@ -89,6 +93,7 @@ import { FavorisModule } from './favoris/favoris.module';
     AvisModule,
     NotificationModule,
     FavorisModule,
+    ContactModule,
   ],
   controllers: [],
   providers: [],

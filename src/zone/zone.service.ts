@@ -6,8 +6,10 @@ import { Zone } from '../entities/zone.entity';
 import { Admin } from '../entities/admin.entity';
 import { Client } from '../entities/client.entity';
 import { NotificationService } from '../notification/notification.service';
+
 import { CreateZoneDto } from './dto/create-zone.dto';
 import { UpdateZoneDto } from './dto/update-zone.dto';
+import { ZoneFilterDto } from './dto/zone-filter.dto';
 
 @Injectable()
 export class ZoneService {
@@ -25,6 +27,7 @@ export class ZoneService {
     private notificationService: NotificationService,
   ) {}
 
+  // ================= CREATE ZONE =================
   async create(dto: CreateZoneDto, adminId: number): Promise<Zone> {
 
     const admin = await this.adminRepository.findOne({
@@ -40,6 +43,7 @@ export class ZoneService {
 
     const saved = await this.zoneRepository.save(zone);
 
+    // 🔔 Notifications
     const clients = await this.clientRepository.find();
 
     for (const client of clients) {
@@ -55,29 +59,84 @@ export class ZoneService {
     return saved;
   }
 
+  // ================= FIND ALL (SIMPLE) =================
   async findAll(): Promise<Zone[]> {
     return this.zoneRepository.find({
       relations: ['admin'],
     });
   }
 
+  // ================= 🔥 ADVANCED SEARCH =================
+  async findAdvanced(filter: ZoneFilterDto) {
 
-  // ================= GET LOCALISATION PUBLIC (visiteurs) =================
-async getLocalisationPublic() {
-  const zones = await this.zoneRepository.find({
-    select: ['idzone', 'nom', 'latitude', 'longitude'],
-  });
+    const {
+      search,
+      ville,
+      page = 1,
+      limit = 10,
+      sortBy = 'idzone',
+      order = 'ASC',
+    } = filter;
 
-  return zones.map(z => ({
-    id: z.idzone,
-    nom: z.nom,
-    latitude: z.latitude,
-    longitude: z.longitude,
-  }));
-}
+    // 🔒 Sécurité tri
+    const allowedSortFields = ['idzone', 'nom', 'ville'];
 
+    if (!allowedSortFields.includes(sortBy)) {
+      throw new Error('Invalid sort field');
+    }
 
+    const query = this.zoneRepository
+      .createQueryBuilder('zone')
+      .leftJoinAndSelect('zone.admin', 'admin');
+
+    // 🔍 SEARCH GLOBAL
+    if (search) {
+      query.andWhere(
+        '(zone.nom LIKE :search OR zone.ville LIKE :search OR zone.description LIKE :search)',
+        { search: '%' + search + '%' },
+      );
+    }
+
+    // 🎯 FILTRAGE
+    if (ville) {
+      query.andWhere('zone.ville LIKE :ville', {
+        ville: '%' + ville + '%',
+      });
+    }
+
+    // 🔄 SORTING — FIX: concaténation à la place du template literal
+    query.orderBy('zone.' + sortBy, order);
+
+    // 📄 PAGINATION — FIX: expressions arithmétiques directes
+    query.skip((page - 1) * limit).take(limit);
+
+    const [data, total] = await query.getManyAndCount();
+
+    return {
+      data,
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    };
+  }
+
+  // ================= LOCALISATION =================
+  async getLocalisationPublic() {
+    const zones = await this.zoneRepository.find({
+      select: ['idzone', 'nom', 'latitude', 'longitude'],
+    });
+
+    return zones.map((z) => ({
+      id: z.idzone,
+      nom: z.nom,
+      latitude: z.latitude,
+      longitude: z.longitude,
+    }));
+  }
+
+  // ================= FIND ONE =================
   async findOne(id: number): Promise<Zone> {
+
     const zone = await this.zoneRepository.findOne({
       where: { idzone: id },
       relations: ['admin'],
@@ -88,7 +147,9 @@ async getLocalisationPublic() {
     return zone;
   }
 
+  // ================= UPDATE =================
   async update(id: number, dto: UpdateZoneDto): Promise<Zone> {
+
     await this.zoneRepository.update(id, dto);
 
     const zone = await this.zoneRepository.findOne({
@@ -101,11 +162,8 @@ async getLocalisationPublic() {
     return zone;
   }
 
+  // ================= DELETE =================
   async remove(id: number) {
     return this.zoneRepository.delete(id);
   }
-  
-
-
-
 }

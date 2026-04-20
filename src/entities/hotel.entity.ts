@@ -25,6 +25,9 @@ export class Hotel {
   @Column()
   nb_Etoiles: number;
 
+  @Column({ default: 0 })
+  nb_chambres: number;
+
   @Column()
   telephone: string;
 
@@ -40,10 +43,12 @@ export class Hotel {
   @ManyToOne(() => Admin, (admin) => admin.hotels)
   admin: Admin;
 
-  // ✅ 🔥 relation ajoutée
-  @ManyToOne(() => HotelManager, (manager) => manager.hotels, { nullable: true })
+
+  @ManyToOne(() => HotelManager, (manager) => manager.hotels, { nullable: true,onDelete: 'SET NULL' })
   hotelManager: HotelManager;
 
-  @OneToMany(() => Chambre, (chambre) => chambre.hotel)
+  @OneToMany(() => Chambre, (chambre) => chambre.hotel, {
+    onDelete: 'SET NULL'
+  })
   chambres: Chambre[];
 } 

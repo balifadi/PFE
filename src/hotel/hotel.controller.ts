@@ -9,11 +9,13 @@ import {
   ParseIntPipe,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 
 import { HotelService } from './hotel.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
+import { HotelFilterDto } from './dto/hotel-filter.dto';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -25,7 +27,6 @@ import {
   ApiOperation,
   ApiBody,
   ApiParam,
-  ApiResponse
 } from '@nestjs/swagger';
 
 @ApiTags('Hotels')
@@ -36,65 +37,68 @@ export class HotelController {
 
   constructor(private readonly hotelService: HotelService) {}
 
-  // ===== CREATE =====
+  // ================= CREATE =================
   @Post()
   @Roles('admin')
   @ApiOperation({ summary: 'Créer un hôtel' })
-  @ApiBody({ type: CreateHotelDto })
-  @ApiResponse({ status: 201, description: 'Hôtel créé avec succès' })
   create(@Body() dto: CreateHotelDto, @Request() req: any) {
     return this.hotelService.create(dto, req.user.iduser);
   }
 
-  // ===== GET ALL =====
+  // ================= FIND ALL =================
   @Get()
   @Roles('admin', 'client', 'hotel-manager')
-  @ApiOperation({ summary: 'Lister tous les hôtels' })
-  @ApiResponse({ status: 200, description: 'Liste des hôtels' })
+  @ApiOperation({ summary: 'Lister tous les hôtels (simple)' })
   findAll(@Request() req: any) {
     return this.hotelService.findAll(req.user.iduser, req.user.role);
   }
 
+  // ================= 🔥 ADVANCED SEARCH =================
+  // ⚠️ Déclaré AVANT :id pour éviter le conflit de route
+  @Get('advanced')
+  @Roles('admin', 'client', 'hotel-manager')
+  @ApiOperation({ summary: 'Search + Filtrage + Pagination + Sorting' })
+  findAdvanced(@Query() filter: HotelFilterDto) {
+    return this.hotelService.findAdvanced(filter);
+  }
 
-  // ===== LOCALISATION PUBLIC =====
+  // ================= LOCALISATION =================
+  // ⚠️ Déclaré AVANT :id pour éviter le conflit de route
   @Get('localisation-public')
-  @ApiOperation({ summary: 'Localisation des hôtels (public)' })
-  @ApiResponse({ status: 200, description: 'Coordonnées publiques des hôtels' })
+  @ApiOperation({ summary: 'Localisation publique des hôtels' })
   getLocalisationPublic() {
     return this.hotelService.getLocalisationPublic();
   }
 
-
-  // ===== GET ONE =====
+  // ================= FIND ONE =================
   @Get(':id')
   @Roles('admin', 'client', 'hotel-manager')
-  @ApiOperation({ summary: 'Afficher un hôtel' })
   @ApiParam({ name: 'id', example: 1 })
-  @ApiResponse({ status: 200, description: 'Détails de l’hôtel' })
   findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
-    return this.hotelService.findOneByUser(id, req.user.iduser, req.user.role);
+    return this.hotelService.findOneByUser(
+      id,
+      req.user.iduser,
+      req.user.role,
+    );
   }
 
-  // ===== UPDATE =====
+  // ================= UPDATE =================
   @Put(':id')
   @Roles('admin')
   @ApiOperation({ summary: 'Modifier un hôtel' })
-  @ApiParam({ name: 'id', example: 1 })
   @ApiBody({ type: UpdateHotelDto })
-  @ApiResponse({ status: 200, description: 'Hôtel mis à jour' })
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateHotelDto) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateHotelDto,
+  ) {
     return this.hotelService.update(id, dto);
   }
 
-  // ===== DELETE =====
+  // ================= DELETE =================
   @Delete(':id')
   @Roles('admin')
   @ApiOperation({ summary: 'Supprimer un hôtel' })
-  @ApiParam({ name: 'id', example: 1 })
-  @ApiResponse({ status: 200, description: 'Hôtel supprimé' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.hotelService.remove(id);
   }
-
-  
 }

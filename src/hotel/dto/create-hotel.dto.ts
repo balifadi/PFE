@@ -17,6 +17,10 @@ export class CreateHotelDto {
   @IsNumber()
   nb_Etoiles: number;
 
+  @ApiProperty({ example: 50, description: 'Nombre de chambres' })
+  @IsNumber()
+  nb_chambres: number;
+
   @ApiProperty({ example: '+21612345678', description: 'Numéro de téléphone' })
   @IsString()
   @IsNotEmpty()

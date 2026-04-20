@@ -18,6 +18,10 @@ export class CreateAgenceDto {
   @IsNotEmpty()
   telephone: string;
 
+  @ApiProperty({ example: 10, description: 'Nombre de voitures' })
+  @IsNumber()
+  nb_voitures: number;
+
   @ApiProperty({ example: 36.8065 })
   @IsNumber()
   latitude: number;

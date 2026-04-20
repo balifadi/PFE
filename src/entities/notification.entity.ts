@@ -20,10 +20,15 @@ export class Notification {
   @Column({ default: false })
   isRead: boolean;
 
-  @ManyToOne(() => Admin, (admin) => admin.notifications, { nullable: true })
+  @ManyToOne(() => Admin, (admin) => admin.notifications,
+    { nullable: true ,
+    onDelete: 'CASCADE',
+  })
   admin: Admin;
-
-  @ManyToOne(() => Client, (client) => client.notifications, { nullable: true })
+  @ManyToOne(() => Client, (client) => client.notifications, 
+  { nullable: true ,
+   onDelete: 'CASCADE',
+  })
   client: Client;
 
 }

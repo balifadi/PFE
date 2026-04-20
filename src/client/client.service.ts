@@ -95,7 +95,6 @@ export class ClientService {
       where: { iduser: clientId },
       relations: ['avis'],
     });
-    
 
     return client?.avis || [];
   }

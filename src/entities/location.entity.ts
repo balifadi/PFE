@@ -24,14 +24,16 @@ export class Location {
   })
   client: Client;
 
-  @ManyToOne(() => AgenceManager, (manager) => manager.locations)
+  @ManyToOne(() => AgenceManager, (manager) => manager.locations,{
+    onDelete: 'SET NULL'
+  })
   agenceManager: AgenceManager;
 
-  @OneToOne(() => Voiture, (voiture) => voiture.location)
+  @OneToOne(() => Voiture, (voiture) => voiture.location,{ onDelete: 'SET NULL'})
   @JoinColumn()
   voiture: Voiture;
 
-  @OneToOne(() => Facture, (facture) => facture.location, { nullable: true })
+  @OneToOne(() => Facture, (facture) => facture.location, { nullable: true , onDelete: 'SET NULL'})
   facture?: Facture;
 
 

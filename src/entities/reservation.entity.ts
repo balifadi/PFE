@@ -19,16 +19,20 @@ export class Reservation {
   @Column()
   statut: string;
 
-  @ManyToOne(() => Client, (client) => client.reservations) 
+  @ManyToOne(() => Client, (client) => client.reservations, {
+  onDelete: 'SET NULL'
+  }) 
   client: Client;
 
-  @ManyToOne(() => HotelManager, (manager) => manager.reservations)
+  @ManyToOne(() => HotelManager, (manager) => manager.reservations, {
+    onDelete: 'SET NULL'
+  })
   hotelManager: HotelManager;
 
-  @OneToMany(() => Chambre, (chambre) => chambre.reservation)
+  @OneToMany(() => Chambre, (chambre) => chambre.reservation, {onDelete: 'SET NULL'})
   chambres: Chambre[];
 
-  @OneToOne(() => Facture, (facture) => facture.reservation, { nullable: true })
+  @OneToOne(() => Facture, (facture) => facture.reservation, { nullable: true ,onDelete: 'SET NULL' })
   facture?: Facture;
 
 }

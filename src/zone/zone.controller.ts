@@ -10,12 +10,14 @@ import {
   UseGuards,
   Request,
   UseInterceptors,
-  UploadedFile
+  UploadedFile,
+  Query,
 } from '@nestjs/common';
 
 import { ZoneService } from './zone.service';
 import { CreateZoneDto } from './dto/create-zone.dto';
 import { UpdateZoneDto } from './dto/update-zone.dto';
+import { ZoneFilterDto } from './dto/zone-filter.dto';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -25,13 +27,9 @@ import {
   ApiTags,
   ApiBearerAuth,
   ApiOperation,
-  ApiBody,
-  ApiParam,
-  ApiResponse,
-  ApiConsumes
+  ApiConsumes,
 } from '@nestjs/swagger';
 
-// ✅ NEW
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -44,11 +42,11 @@ export class ZoneController {
 
   constructor(private readonly zoneService: ZoneService) {}
 
-  // ===== CREATE =====
+  // ================= CREATE =================
   @Post()
   @Roles('admin')
   @ApiOperation({ summary: 'Créer une zone touristique' })
-  @ApiConsumes('multipart/form-data') // ✅ NEW
+  @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('image', {
       storage: diskStorage({
@@ -56,58 +54,59 @@ export class ZoneController {
         filename: (req, file, cb) => {
           const uniqueName = Date.now() + extname(file.originalname);
           cb(null, uniqueName);
-        }
-      })
-    })
+        },
+      }),
+    }),
   )
-  @ApiBody({ type: CreateZoneDto })
-  @ApiResponse({ status: 201, description: 'Zone créée avec succès' })
   create(
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: CreateZoneDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
-
-    // ✅ ajout image
     if (file) {
-      dto.imagePath = `http://localhost:3000/uploads/${file.filename}`;
+      dto.imagePath = 'http://localhost:3000/uploads/' + file.filename;
     }
-
     return this.zoneService.create(dto, req.user.iduser);
   }
 
-  // ===== GET ALL =====
+  // ================= FIND ALL =================
   @Get()
   @Roles('admin', 'client')
-  @ApiOperation({ summary: 'Lister toutes les zones' })
-  @ApiResponse({ status: 200, description: 'Liste des zones' })
+  @ApiOperation({ summary: 'Lister toutes les zones (simple)' })
   findAll() {
     return this.zoneService.findAll();
   }
 
-  // ===== LOCALISATION PUBLIC =====
+  // ================= 🔥 ADVANCED SEARCH =================
+  // ⚠️ Déclaré AVANT :id pour éviter le conflit de route
+  @Get('advanced')
+  @Roles('admin', 'client')
+  @ApiOperation({ summary: 'Search + Filtrage + Pagination + Sorting' })
+  findAdvanced(@Query() filter: ZoneFilterDto) {
+    return this.zoneService.findAdvanced(filter);
+  }
+
+  // ================= LOCALISATION =================
+  // ⚠️ Déclaré AVANT :id pour éviter le conflit de route
   @Get('localisation-public')
-  @ApiOperation({ summary: 'Localisation des zones (public)' })
-  @ApiResponse({ status: 200, description: 'Coordonnées publiques des zones' })
+  @ApiOperation({ summary: 'Localisation publique des zones' })
   getLocalisationPublic() {
     return this.zoneService.getLocalisationPublic();
   }
 
-  // ===== GET ONE =====
+  // ================= FIND ONE =================
   @Get(':id')
   @Roles('admin', 'client')
-  @ApiOperation({ summary: 'Afficher une zone' })
-  @ApiParam({ name: 'id', example: 1 })
-  @ApiResponse({ status: 200, description: 'Détails de la zone' })
+  @ApiOperation({ summary: 'Obtenir une zone par ID' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.zoneService.findOne(id);
   }
 
-  // ===== UPDATE =====
+  // ================= UPDATE =================
   @Put(':id')
   @Roles('admin')
   @ApiOperation({ summary: 'Modifier une zone' })
-  @ApiConsumes('multipart/form-data') // ✅ NEW
+  @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('image', {
       storage: diskStorage({
@@ -115,33 +114,25 @@ export class ZoneController {
         filename: (req, file, cb) => {
           const uniqueName = Date.now() + extname(file.originalname);
           cb(null, uniqueName);
-        }
-      })
-    })
+        },
+      }),
+    }),
   )
-  @ApiParam({ name: 'id', example: 1 })
-  @ApiBody({ type: UpdateZoneDto })
-  @ApiResponse({ status: 200, description: 'Zone mise à jour' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: Express.Multer.File,
-    @Body() dto: UpdateZoneDto
+    @Body() dto: UpdateZoneDto,
   ) {
-
-    // ✅ ajout image si existe
     if (file) {
-      dto.imagePath = `http://localhost:3000/uploads/${file.filename}`;
+      dto.imagePath = 'http://localhost:3000/uploads/' + file.filename;
     }
-
     return this.zoneService.update(id, dto);
   }
 
-  // ===== DELETE =====
+  // ================= DELETE =================
   @Delete(':id')
   @Roles('admin')
   @ApiOperation({ summary: 'Supprimer une zone' })
-  @ApiParam({ name: 'id', example: 1 })
-  @ApiResponse({ status: 200, description: 'Zone supprimée' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.zoneService.remove(id);
   }

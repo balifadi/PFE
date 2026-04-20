@@ -6,8 +6,9 @@ import { Facture } from './facture.entity';
 import { Notification } from './notification.entity';
 import { Avis } from './avis.entity';
 import { Favoris } from './favoris.entity';
+import { Contact } from './contact.entity';
 
-@ChildEntity('client') // ✅ valeur explicite
+@ChildEntity('client')
 export class Client extends User {
 
   @OneToMany(() => Reservation, (reservation) => reservation.client)
@@ -17,7 +18,7 @@ export class Client extends User {
   locations: Location[];
 
   @OneToMany(() => Facture, (facture) => facture.client)
-  factures: Facture[];   // ← tableau obligatoire avec OneToMany
+  factures: Facture[];
 
   @OneToMany(() => Notification, (notification) => notification.client)
   notifications: Notification[];
@@ -27,4 +28,7 @@ export class Client extends User {
 
   @OneToMany(() => Favoris, (favoris) => favoris.client)
   favoris: Favoris[];
+
+  @OneToMany(() => Contact, (contact) => contact.client)
+  contacts: Contact[];
 }

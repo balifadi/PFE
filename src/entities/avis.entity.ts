@@ -22,9 +22,13 @@ export class Avis {
 
   @Column()
   targetId: number;
-  @ManyToOne(() => Admin, (admin) => admin.avis)
+  @ManyToOne(() => Admin, (admin) => admin.avis, {
+  onDelete: 'SET NULL'
+  })
   admin: Admin;
 
-  @ManyToOne(() => Client, (client) => client.avis)
+  @ManyToOne(() => Client, (client) => client.avis, {
+  onDelete: 'SET NULL'
+  })
   client: Client;
 }

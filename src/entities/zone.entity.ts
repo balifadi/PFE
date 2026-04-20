@@ -24,6 +24,6 @@ export class Zone {
   @Column({ type: 'double' })
   longitude: number;
 
-  @ManyToOne(() => Admin, (admin) => admin.zones)
+  @ManyToOne(() => Admin, (admin) => admin.zones, {onDelete: 'SET NULL'})
   admin: Admin;
 }

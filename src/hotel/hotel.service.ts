@@ -1,7 +1,7 @@
- import {
-Injectable,
-ForbiddenException,
-NotFoundException,
+import {
+  Injectable,
+  ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
@@ -14,121 +14,211 @@ import { NotificationService } from '../notification/notification.service';
 
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
+import { HotelFilterDto } from './dto/hotel-filter.dto';
 
 @Injectable()
 export class HotelService {
 
-constructor(
-@InjectRepository(Hotel)
-private hotelRepository: Repository<Hotel>,
+  constructor(
+    @InjectRepository(Hotel)
+    private hotelRepository: Repository<Hotel>,
 
-@InjectRepository(Admin)  
-private adminRepository: Repository<Admin>,  
+    @InjectRepository(Admin)
+    private adminRepository: Repository<Admin>,
 
-@InjectRepository(Client)  
-private clientRepository: Repository<Client>,  
+    @InjectRepository(Client)
+    private clientRepository: Repository<Client>,
 
-private notificationService: NotificationService,
+    private notificationService: NotificationService,
+  ) {}
 
-) {}
+  // ================= CREATE HOTEL =================
+  async create(dto: CreateHotelDto, adminId: number): Promise<Hotel> {
 
-async create(dto: CreateHotelDto, adminId: number): Promise<Hotel> {
+    const admin = await this.adminRepository.findOne({
+      where: { iduser: adminId },
+    });
 
-const admin = await this.adminRepository.findOne({  
-  where: { iduser: adminId },  
-});  
+    if (!admin) throw new NotFoundException('Admin non trouve');
 
-if (!admin) throw new NotFoundException('Admin non trouve');  
+    const hotel = this.hotelRepository.create({
+      ...dto,
+      admin,
+    });
 
-const hotel = this.hotelRepository.create({  
-  ...dto,  
-  admin,  
-});  
+    const saved = await this.hotelRepository.save(hotel);
 
-const saved = await this.hotelRepository.save(hotel);  
+    // 🔔 Notifications
+    const clients = await this.clientRepository.find();
 
-const clients = await this.clientRepository.find();  
+    for (const client of clients) {
+      await this.notificationService.create({
+        clientId: client.iduser,
+        message: 'Nouvel hotel ajoute : ' + saved.nom,
+        type: 'hotel',
+        senderRole: 'admin',
+        senderId: adminId,
+      });
+    }
 
-for (const client of clients) {  
-  await this.notificationService.create({  
-    clientId: client.iduser,  
-    message: 'Nouvel hotel ajoute : ' + saved.nom,  
-    type: 'hotel',  
-    senderRole: 'admin',  
-    senderId: adminId,  
-  });  
-}  
+    return saved;
+  }
 
-return saved;
+  // ================= FIND ALL (ROLE BASED) =================
+  async findAll(userId: number, role: string): Promise<Hotel[]> {
 
-}
+    if (role === 'admin' || role === 'client') {
+      return this.hotelRepository.find({
+        relations: ['admin', 'chambres', 'hotelManager'],
+      });
+    }
 
-async findAll(userId: number, role: string): Promise<Hotel[]> {
+    if (role === 'hotel-manager') {
+      return this.hotelRepository.find({
+        where: { hotelManager: { iduser: userId } },
+        relations: ['admin', 'chambres', 'hotelManager'],
+      });
+    }
 
-if (role === 'admin' || role === 'client') {  
-  return this.hotelRepository.find({  
-    relations: ['admin', 'chambres', 'hotelManager'],  
-  });  
-}  
+    throw new ForbiddenException('Acces refuse');
+  }
 
-if (role === 'hotel-manager') {  
-  return this.hotelRepository.find({  
-    where: { hotelManager: { iduser: userId } },  
-    relations: ['admin', 'chambres', 'hotelManager'],  
-  });  
-}  
+  // ================= 🔥 ADVANCED SEARCH =================
+  async findAdvanced(filter: HotelFilterDto) {
 
-throw new ForbiddenException('Acces refuse');
+    const {
+      search,
+      ville,
+      nb_Etoiles,
+      nb_chambres,
+      page = 1,
+      limit = 10,
+      sortBy = 'idhotel',
+      order = 'ASC',
+    } = filter;
 
-}
+    // 🔒 Sécurisation tri
+    const allowedSortFields = ['idhotel', 'nom', 'ville', 'nb_Etoiles', 'nb_chambres'];
 
-// ================= GET LOCALISATION PUBLIC (visiteurs) =================
-async getLocalisationPublic() {
-const hotels = await this.hotelRepository.find({
-select: ['idhotel', 'nom', 'latitude', 'longitude'],
-});
+    if (!allowedSortFields.includes(sortBy)) {
+      throw new Error('Invalid sort field');
+    }
 
-return hotels.map(h => ({
-id: h.idhotel,
-nom: h.nom,
-latitude: h.latitude,
-longitude: h.longitude,
-}));
-}
+    const query = this.hotelRepository
+      .createQueryBuilder('hotel')
+      .leftJoinAndSelect('hotel.admin', 'admin')
+      .leftJoinAndSelect('hotel.chambres', 'chambres')
+      .leftJoinAndSelect('hotel.hotelManager', 'hotelManager');
 
-async findOneByUser(id: number, userId: number, role: string): Promise<Hotel> {
+    // 🔍 SEARCH GLOBAL
+    if (search) {
+      query.andWhere(
+        '(hotel.nom LIKE :search OR hotel.ville LIKE :search)',
+        { search: '%' + search + '%' },
+      );
+    }
 
-const hotel = await this.hotelRepository.findOne({  
-  where: { idhotel: id },  
-  relations: ['admin', 'chambres', 'hotelManager'],  
-});  
+    // 🎯 FILTRAGE
+    if (ville) {
+      query.andWhere('hotel.ville LIKE :ville', {
+        ville: '%' + ville + '%',
+      });
+    }
 
-if (!hotel) throw new NotFoundException('Hotel non trouve');  
+    if (nb_Etoiles) {
+      query.andWhere('hotel.nb_Etoiles = :nb', {
+        nb: nb_Etoiles,
+      });
+    }
 
-if (role === 'hotel-manager' && hotel.hotelManager?.iduser !== userId) {  
-  throw new ForbiddenException('Acces refuse');  
-}  
+    if (nb_chambres) {
+      query.andWhere('hotel.nb_chambres = :nbCh', {
+        nbCh: nb_chambres,
+      });
+    }
 
-return hotel;
+    // 🔄 SORTING — FIX: concaténation à la place du template literal
+    query.orderBy('hotel.' + sortBy, order);
 
-}
+    // 📄 PAGINATION — FIX: expressions arithmétiques directes
+    query.skip((page - 1) * limit).take(limit);
 
-async update(id: number, dto: UpdateHotelDto): Promise<Hotel> {
+    const [data, total] = await query.getManyAndCount();
 
-await this.hotelRepository.update(id, dto);  
+    return {
+      data,
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    };
+  }
 
-const updated = await this.hotelRepository.findOne({  
-  where: { idhotel: id },  
-  relations: ['admin', 'chambres', 'hotelManager'],  
-});  
+  // ================= LOCALISATION PUBLIC =================
+  async getLocalisationPublic() {
+    const hotels = await this.hotelRepository.find({
+      select: ['idhotel', 'nom', 'latitude', 'longitude'],
+    });
 
-if (!updated) throw new NotFoundException('Hotel non trouve');  
+    return hotels.map((h) => ({
+      id: h.idhotel,
+      nom: h.nom,
+      latitude: h.latitude,
+      longitude: h.longitude,
+    }));
+  }
 
-return updated;
+  // ================= FIND ONE =================
+  async findOneByUser(id: number, userId: number, role: string): Promise<Hotel> {
 
-}
+    const hotel = await this.hotelRepository.findOne({
+      where: { idhotel: id },
+      relations: ['admin', 'chambres', 'hotelManager'],
+    });
 
-async remove(id: number) {
-return this.hotelRepository.delete(id);
-}
+    if (!hotel) throw new NotFoundException('Hotel non trouve');
+
+    if (role === 'hotel-manager' && hotel.hotelManager?.iduser !== userId) {
+      throw new ForbiddenException('Acces refuse');
+    }
+
+    return hotel;
+  }
+
+  // ================= UPDATE =================
+  async update(id: number, dto: UpdateHotelDto): Promise<Hotel> {
+    // Normalize incoming DTO keys to match entity property names
+    const normalize = (s: string) =>
+      s.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '').replace(/__+/g, '_');
+
+    const columns = this.hotelRepository.metadata.columns.map((c) => c.propertyName);
+    const mapping: Record<string, string> = {};
+    for (const prop of columns) {
+      mapping[normalize(prop)] = prop;
+    }
+
+    const payload: Record<string, any> = {};
+    for (const [key, value] of Object.entries(dto as any)) {
+      if (value === undefined) continue;
+      const realKey = mapping[normalize(key)];
+      if (realKey) payload[realKey] = value;
+    }
+
+    if (Object.keys(payload).length > 0) {
+      await this.hotelRepository.update(id, payload);
+    }
+
+    const updated = await this.hotelRepository.findOne({
+      where: { idhotel: id },
+      relations: ['admin', 'chambres', 'hotelManager'],
+    });
+
+    if (!updated) throw new NotFoundException('Hotel non trouve');
+
+    return updated;
+  }
+
+  // ================= DELETE =================
+  async remove(id: number) {
+    return this.hotelRepository.delete(id);
+  }
 }

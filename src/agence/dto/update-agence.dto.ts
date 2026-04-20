@@ -27,4 +27,9 @@ export class UpdateAgenceDto {
   @IsOptional()
   @IsNumber()
   longitude?: number;
+
+  @ApiPropertyOptional({ example: 8 })
+  @IsOptional()
+  @IsNumber()
+  nb_voitures?: number;
 }

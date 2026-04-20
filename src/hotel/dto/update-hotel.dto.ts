@@ -18,6 +18,11 @@ export class UpdateHotelDto {
   @IsNumber()
   nb_Etoiles?: number;
 
+  @ApiPropertyOptional({ example: 45 })
+  @IsOptional()
+  @IsNumber()
+  nb_chambres?: number;
+
   @ApiPropertyOptional({ example: '+21698765432' })
   @IsOptional()
   @IsString()
