@@ -1,8 +1,10 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToOne, JoinColumn } from 'typeorm';
+import { Transform } from 'class-transformer';
 import { Client } from './client.entity';
 import { AgenceManager } from './agence-manager.entity';
 import { Voiture } from './voiture.entity';
 import { Facture } from './facture.entity';
+import { Agence } from './agence.entity';
 
 @Entity()
 export class Location {
@@ -19,22 +21,26 @@ export class Location {
   @Column()
   statut: string;
 
+  @Column({ type: 'decimal', nullable: true, default: 0 })
+  @Transform(({ value }) => `${value} DT`)
+  montant: number;
+
   @ManyToOne(() => Client, (client) => client.locations,{
     onDelete: 'SET NULL'
   })
   client: Client;
 
-  @ManyToOne(() => AgenceManager, (manager) => manager.locations,{
-    onDelete: 'SET NULL'
-  })
+  @ManyToOne(() => AgenceManager, (manager) => manager.locations)
   agenceManager: AgenceManager;
 
-  @OneToOne(() => Voiture, (voiture) => voiture.location,{ onDelete: 'SET NULL'})
+  @OneToOne(() => Voiture, (voiture) => voiture.location)
   @JoinColumn()
   voiture: Voiture;
 
-  @OneToOne(() => Facture, (facture) => facture.location, { nullable: true , onDelete: 'SET NULL'})
-  facture?: Facture;
+  @OneToOne(() => Facture, (facture) => facture.location)
+  facture: Facture;
 
+  @ManyToOne(() => Agence, { nullable: true, onDelete: 'SET NULL' })
+  agence: Agence;
 
 }

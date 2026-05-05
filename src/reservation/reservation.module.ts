@@ -6,6 +6,7 @@ import { Client } from '../entities/client.entity';
 import { HotelManager } from '../entities/hotel-manager.entity';
 import { Chambre } from '../entities/chambre.entity';
 import { Facture } from '../entities/facture.entity';
+import { Hotel } from '../entities/hotel.entity';
 
 import { ReservationService } from './reservation.service';
 import { ReservationController } from './reservation.controller';
@@ -21,6 +22,7 @@ import { FactureModule } from '../facture/facture.module'; // ✅ مهم جدا�
       HotelManager,
       Chambre,
       Facture,
+      Hotel,
     ]),
 
     NotificationModule, // ✅ باش نستعمل NotificationService

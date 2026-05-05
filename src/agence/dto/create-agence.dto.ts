@@ -1,5 +1,5 @@
-import { IsString, IsNumber, IsNotEmpty } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNumber, IsNotEmpty, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateAgenceDto {
 
@@ -29,4 +29,9 @@ export class CreateAgenceDto {
   @ApiProperty({ example: 10.1815 })
   @IsNumber()
   longitude: number;
+
+  @ApiPropertyOptional({ example: 15, description: 'ID du Agence Manager assigné à cette agence' })
+  @IsOptional()
+  @IsNumber()
+  agenceManagerId?: number;
 }

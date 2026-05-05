@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToOne, JoinColumn } from 'typeorm';
+import { Transform } from 'class-transformer';
 import { Client } from './client.entity';
 import { Reservation } from './reservation.entity';
 import { Location } from './location.entity';
@@ -13,6 +14,7 @@ export class Facture {
   mode_Paiement: string;
 
   @Column({ type: 'float', default: 0 })
+  @Transform(({ value }) => `${value} DT`)
   montant_Total: number;
 
   @Column({ type: 'date' })

@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import { Location } from '../entities/location.entity';
 import { NotificationService } from '../notification/notification.service';
 import { FactureService } from '../facture/facture.service';
+import { Agence } from '../entities/agence.entity';
 
 import { CreateLocationDto } from './dto/create-location.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
@@ -24,27 +25,36 @@ export class LocationService {
     private factureService: FactureService,
   ) {}
 
-  // ===== CREATE =====
-  async create(dto: CreateLocationDto): Promise<Location> {
+ async create(dto: CreateLocationDto, clientId: number): Promise<Location> {
 
-    const location = this.locationRepository.create({
-      date_debut: dto.date_debut,
-      date_fin: dto.date_fin,
-      statut: 'en attente',
-
-      voiture: { idvoiture: dto.voitureId } as any,
-      agenceManager: { iduser: dto.agenceId } as any,
+  // Récupérer l'agence avec son manager
+  const agence = await this.locationRepository.manager
+    .getRepository('Agence')
+    .findOne({ 
+      where: { idagence: dto.idagence }, 
+      relations: ['agenceManager'] 
     });
 
-    return this.locationRepository.save(location);
-  }
+   const location = this.locationRepository.create({
+     date_debut: dto.date_debut,
+     date_fin: dto.date_fin,
+     statut: 'en attente',
+     montant: dto.montant,
 
+     client: { iduser: clientId } as any,
+     agence: { idagence: dto.idagence } as any,
+     voiture: { idvoiture: dto.voitureId } as any,
+     agenceManager: agence?.agenceManager,
+   });
+
+   return this.locationRepository.save(location);
+ }
   // ===== CONFIRMER =====
   async confirmerLocation(id: number, clientId: number): Promise<void> {
 
     const location = await this.locationRepository.findOne({
       where: { idlocation: id },
-      relations: ['client', 'voiture', 'agenceManager'],
+     relations: ['client', 'voiture', 'agenceManager', 'agence'],
     });
 
     if (!location) throw new NotFoundException('Location non trouvée');
@@ -110,23 +120,27 @@ export class LocationService {
 
     if (role === 'admin') {
       return this.locationRepository.find({
-        relations: ['client','agenceManager','voiture','facture'],
+        relations: ['client','agenceManager','voiture','facture','agence'],
       });
     }
 
     if (role === 'client') {
       return this.locationRepository.find({
         where: { client: { iduser: userId } },
-        relations: ['client','agenceManager','voiture','facture'],
+        relations: ['client','agenceManager','voiture','facture','agence'],
       });
     }
 
     // ✅ agence-manager
     if (role === 'agence-manager') {
-      return this.locationRepository.find({
-        where: { agenceManager: { iduser: userId } },
-        relations: ['client','agenceManager','voiture','facture'],
-      });
+      return this.locationRepository.createQueryBuilder('location')
+        .leftJoinAndSelect('location.client', 'client')
+        .leftJoinAndSelect('location.agenceManager', 'agenceManager')
+        .leftJoinAndSelect('location.voiture', 'voiture')
+        .leftJoinAndSelect('location.facture', 'facture')
+        .leftJoinAndSelect('location.agence', 'agence')
+        .where('agenceManager.iduser = :userId', { userId })
+        .getMany();
     }
 
     return [];
@@ -137,7 +151,7 @@ export class LocationService {
 
     const location = await this.locationRepository.findOne({
       where: { idlocation: id },
-      relations: ['client','agenceManager','voiture','facture'],
+      relations: ['client','agenceManager','voiture','facture','agence'],
     });
 
     if (!location) throw new NotFoundException('Location non trouvée');

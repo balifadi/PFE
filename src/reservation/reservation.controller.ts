@@ -25,15 +25,11 @@ export class ReservationController {
   constructor(private readonly reservationService: ReservationService) {}
 
   // ===== CREATE =====
-  @Post()
-  @Roles('client')
-  @ApiOperation({ summary: 'Créer une réservation' })
-  @ApiBody({ type: CreateReservationDto })
-  @ApiResponse({ status: 201, description: 'Réservation créée avec succès' })
-  create(@Body() dto: CreateReservationDto) {
-    return this.reservationService.create(dto);
-  }
-
+ @Post()
+@Roles('client')
+create(@Body() dto: CreateReservationDto, @Request() req: any) {
+  return this.reservationService.create(dto, req.user.iduser);
+}
   // ===== CONFIRMER =====
   @Patch('confirmer/:id/:clientId')
   @Roles('hotel-manager')

@@ -18,8 +18,13 @@ export class CreateReservationDto {
   @IsNotEmpty()
   chambreId: number;
 
-  @ApiProperty({ example: 1, description: 'ID de l’hôtel concerné' })
+  @ApiProperty({ example: 1, description: 'ID de l\'hotel' })
   @IsNumber()
   @IsNotEmpty()
-  hotelId: number;
+  idhotel: number;
+
+  @ApiProperty({ example: 1250.50, description: 'Montant total de la réservation' })
+  @IsNumber()
+  montant: number;
+
 }

@@ -24,13 +24,15 @@ export class Voiture {
   @Column({ type: 'decimal' })
   prix_Jour: number;
   
-  @ManyToOne(() => AgenceManager, (manager) => manager.voitures, {onDelete: 'SET NULL'})
+  @ManyToOne(() => AgenceManager, (manager) => manager.voitures)
   agenceManager: AgenceManager;
 
-  @ManyToOne(() => Agence, (agence) => agence.voitures, {onDelete: 'SET NULL'})
+  @ManyToOne(() => Agence, (agence) => agence.voitures, {
+  onDelete: 'CASCADE'
+  })
   agence: Agence;
 
-  @OneToOne(() => Location, (location) => location.voiture, {onDelete: 'SET NULL'})
+  @OneToOne(() => Location, (location) => location.voiture)
   location: Location;
 
 }                        

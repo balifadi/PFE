@@ -22,13 +22,12 @@ export class LocationController {
   constructor(private readonly locationService: LocationService) {}
 
   // ===== CREATE =====
+ // ===== CREATE =====
   @Post()
-  @Roles('client')
-  @ApiOperation({ summary: 'Créer une nouvelle location' })
-  @ApiBody({ type: CreateLocationDto })
-  create(@Body() dto: CreateLocationDto) {
-    return this.locationService.create(dto);
-  }
+ @Roles('client')
+ create(@Body() dto: CreateLocationDto, @Request() req: any) {
+   return this.locationService.create(dto, req.user.iduser);
+ }
 
   // ===== CONFIRMER =====
   @Patch('confirmer/:id/:clientId')

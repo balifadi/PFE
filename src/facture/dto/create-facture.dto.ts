@@ -24,11 +24,6 @@ export class CreateFactureDto {
   @IsNotEmpty()
   mode_Paiement: string;
 
-  @ApiProperty({ description: 'Montant total de la facture', example: 250.50 })
-  @IsNumber()
-  @IsNotEmpty()
-  montant_Total: number;
-
   @ApiProperty({ description: 'Date de la facture', example: '2026-04-04T10:00:00Z' })
   @Type(() => Date)
   @IsDate()

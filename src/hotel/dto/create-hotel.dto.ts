@@ -38,4 +38,9 @@ export class CreateHotelDto {
   @ApiProperty({ example: 10.1815, description: 'Longitude' })
   @IsNumber()
   longitude: number;
+
+  @ApiPropertyOptional({ example: 12, description: 'ID du Hotel Manager assigné à cet hôtel' })
+  @IsOptional()
+  @IsNumber()
+  hotelManagerId?: number;
 }

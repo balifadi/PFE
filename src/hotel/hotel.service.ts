@@ -11,6 +11,7 @@ import { Hotel } from '../entities/hotel.entity';
 import { Admin } from '../entities/admin.entity';
 import { Client } from '../entities/client.entity';
 import { NotificationService } from '../notification/notification.service';
+import { ChambreService } from '../chambre/chambre.service';
 
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
@@ -30,6 +31,7 @@ export class HotelService {
     private clientRepository: Repository<Client>,
 
     private notificationService: NotificationService,
+    private chambreService: ChambreService,
   ) {}
 
   // ================= CREATE HOTEL =================
@@ -44,9 +46,25 @@ export class HotelService {
     const hotel = this.hotelRepository.create({
       ...dto,
       admin,
+      hotelManager: dto.hotelManagerId ? { iduser: dto.hotelManagerId } : undefined,
     });
 
     const saved = await this.hotelRepository.save(hotel);
+
+    // 🛏️ CRÉATION AUTOMATIQUE DES CHAMBRES PAR DÉFAUT
+    if (saved.nb_chambres && saved.nb_chambres > 0) {
+      const adminUser = { id: adminId, role: 'admin' };
+      
+      for (let i = 1; i <= saved.nb_chambres; i++) {
+        await this.chambreService.create({
+          hotelId: saved.idhotel,
+          numero: i,
+          capacite: 2,
+          etat: 'disponible',
+          prix_Nuit: 120
+        }, adminUser);
+      }
+    }
 
     // 🔔 Notifications
     const clients = await this.clientRepository.find();
@@ -74,10 +92,12 @@ export class HotelService {
     }
 
     if (role === 'hotel-manager') {
-      return this.hotelRepository.find({
-        where: { hotelManager: { iduser: userId } },
-        relations: ['admin', 'chambres', 'hotelManager'],
-      });
+      return this.hotelRepository.createQueryBuilder('hotel')
+        .leftJoinAndSelect('hotel.admin', 'admin')
+        .leftJoinAndSelect('hotel.chambres', 'chambres')
+        .leftJoinAndSelect('hotel.hotelManager', 'hotelManager')
+        .where('hotelManager.iduser = :userId', { userId })
+        .getMany();
     }
 
     throw new ForbiddenException('Acces refuse');

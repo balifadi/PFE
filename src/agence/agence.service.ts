@@ -10,6 +10,7 @@ import { Agence } from '../entities/agence.entity';
 import { Admin } from '../entities/admin.entity';
 import { Client } from '../entities/client.entity';
 import { NotificationService } from '../notification/notification.service';
+import { VoitureService } from '../voiture/voiture.service';
 
 import { CreateAgenceDto } from './dto/create-agence.dto';
 import { UpdateAgenceDto } from './dto/update-agence.dto';
@@ -28,6 +29,7 @@ export class AgenceService {
     private clientRepository: Repository<Client>,
 
     private notificationService: NotificationService,
+    private voitureService: VoitureService,
   ) {}
 
   // ================= CREATE =================
@@ -41,9 +43,26 @@ export class AgenceService {
     const agence = this.agenceRepository.create({
       ...dto,
       admin,
+      agenceManager: dto.agenceManagerId ? { iduser: dto.agenceManagerId } : undefined,
     });
 
     const saved = await this.agenceRepository.save(agence);
+
+    // 🚗 CRÉATION AUTOMATIQUE DES VOITURES PAR DÉFAUT
+    if (saved.nb_voitures && saved.nb_voitures > 0) {
+      const adminUser = { id: adminId, role: 'admin' };
+      
+      for (let i = 1; i <= saved.nb_voitures; i++) {
+        await this.voitureService.create({
+          agenceId: saved.idagence,
+          marque: 'BMW',
+          modele: 'Série 3',
+          immatriculation: `2${String(i).padStart(3, '0')} TUN 2630`,
+          etat: 'disponible',
+          prix_Jour: 200
+        }, adminUser);
+      }
+    }
 
     // 🔔 Notifications
     const clients = await this.clientRepository.find();
@@ -69,10 +88,12 @@ export class AgenceService {
     }
 
     if (role === 'agence-manager') {
-      return this.agenceRepository.find({
-        where: { agenceManager: { iduser: userId } },
-        relations: ['admin', 'voitures', 'agenceManager'],
-      });
+      return this.agenceRepository.createQueryBuilder('agence')
+        .leftJoinAndSelect('agence.admin', 'admin')
+        .leftJoinAndSelect('agence.voitures', 'voitures')
+        .leftJoinAndSelect('agence.agenceManager', 'agenceManager')
+        .where('agenceManager.iduser = :userId', { userId })
+        .getMany();
     }
 
     throw new ForbiddenException('Acces refuse');

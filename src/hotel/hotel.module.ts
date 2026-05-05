@@ -7,6 +7,7 @@ import { Chambre } from '../entities/chambre.entity';
 import { HotelManager } from '../entities/hotel-manager.entity';
 
 import { NotificationModule } from '../notification/notification.module';
+import { ChambreModule } from '../chambre/chambre.module';
 import { HotelService } from './hotel.service';
 import { HotelController } from './hotel.controller';
 import { Client } from '../entities/client.entity';
@@ -21,6 +22,7 @@ import { Notification } from '../entities/notification.entity';
       Notification
     ]),
     NotificationModule,
+    ChambreModule,
   ],
   controllers: [HotelController],
   providers: [HotelService],

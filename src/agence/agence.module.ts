@@ -7,6 +7,7 @@ import { Voiture } from '../entities/voiture.entity';
 import { AgenceManager } from '../entities/agence-manager.entity';
 
 import { NotificationModule } from '../notification/notification.module';
+import { VoitureModule } from '../voiture/voiture.module';
 import { AgenceService } from './agence.service';
 import { AgenceController } from './agence.controller';
 import { Client } from '../entities/client.entity';
@@ -21,6 +22,7 @@ import { Notification } from '../entities/notification.entity';
       Notification
     ]),
     NotificationModule,
+    VoitureModule,
   ],
   controllers: [AgenceController],
   providers: [AgenceService],

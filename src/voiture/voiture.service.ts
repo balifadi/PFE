@@ -21,9 +21,18 @@ export class VoitureService {
   async create(dto: CreateVoitureDto, user: any): Promise<Voiture> {
 
     if (user.role === 'admin') {
+      // Récupérer l'agence pour récupérer son manager automatiquement
+      const agence = await this.voitureRepository.manager
+        .getRepository('Agence')
+        .findOne({
+          where: { idagence: dto.agenceId },
+          relations: ['agenceManager']
+        });
+
       const voiture = this.voitureRepository.create({
         ...dto,
         agence: { idagence: dto.agenceId },
+        agenceManager: agence?.agenceManager,
       });
       return this.voitureRepository.save(voiture);
     }
@@ -50,10 +59,12 @@ export class VoitureService {
     }
 
     if (role === 'agence-manager') {
-      return this.voitureRepository.find({
-        where: { agenceManager: { iduser: userId } },
-        relations: ['agenceManager', 'agence', 'location'],
-      });
+      return this.voitureRepository.createQueryBuilder('voiture')
+        .leftJoinAndSelect('voiture.agenceManager', 'agenceManager')
+        .leftJoinAndSelect('voiture.agence', 'agence')
+        .leftJoinAndSelect('voiture.location', 'location')
+        .where('agenceManager.iduser = :userId', { userId })
+        .getMany();
     }
 
     // client + hotel-manager

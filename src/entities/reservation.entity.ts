@@ -1,8 +1,10 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, OneToOne } from 'typeorm';
+import { Transform } from 'class-transformer';
 import { Client } from './client.entity';
 import { HotelManager } from './hotel-manager.entity';
 import { Chambre } from './chambre.entity';
 import { Facture } from './facture.entity';
+import { Hotel } from './hotel.entity';
 
 @Entity()
 export class Reservation {
@@ -18,6 +20,10 @@ export class Reservation {
 
   @Column()
   statut: string;
+
+  @Column({ type: 'decimal', nullable: true, default: 0 })
+  @Transform(({ value }) => `${value} DT`)
+  montant: number;
 
   @ManyToOne(() => Client, (client) => client.reservations, {
   onDelete: 'SET NULL'
@@ -35,4 +41,7 @@ export class Reservation {
   @OneToOne(() => Facture, (facture) => facture.reservation, { nullable: true ,onDelete: 'SET NULL' })
   facture?: Facture;
 
-}
+  @ManyToOne(() => Hotel, { nullable: true, onDelete: 'SET NULL' })
+  hotel: Hotel;
+
+}  

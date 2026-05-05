@@ -102,7 +102,7 @@ export class NotificationService {
     return [];
   }
 
-  // ✅ API مخصصة للـ client
+  
   async getByClient(clientId: number): Promise<Notification[]> {
     return this.notificationRepository.find({
       where: { client: { iduser: clientId } },

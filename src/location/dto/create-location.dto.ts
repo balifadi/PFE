@@ -13,13 +13,19 @@ export class CreateLocationDto {
   @IsNotEmpty()
   date_fin: Date;
 
+
   @ApiProperty({ example: 1, description: 'Voiture choisie' })
   @IsNumber()
   @IsNotEmpty()
   voitureId: number;
 
-  @ApiProperty({ example: 1, description: 'Agence concernée' })
+  @ApiProperty({ example: 1, description: 'ID de l\'agence' })
   @IsNumber()
   @IsNotEmpty()
-  agenceId: number;
+  idagence: number;
+
+  @ApiProperty({ example: 890.75, description: 'Montant total de la location' })
+  @IsNumber()
+  montant: number;
+
 }

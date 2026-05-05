@@ -1,13 +1,17 @@
 import {
   Injectable,
   NotFoundException,
-  ForbiddenException
+  ForbiddenException,
+  BadRequestException,   // ✅ AJOUT
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { Reservation } from '../entities/reservation.entity';
+import { Client } from '../entities/client.entity';
+import { HotelManager } from '../entities/hotel-manager.entity';
+import { Hotel } from '../entities/hotel.entity';
 import { NotificationService } from '../notification/notification.service';
 import { FactureService } from '../facture/facture.service';
 
@@ -20,31 +24,48 @@ export class ReservationService {
   constructor(
     @InjectRepository(Reservation)
     private reservationRepository: Repository<Reservation>,
+
+    @InjectRepository(Client)
+    private clientRepository: Repository<Client>,
+
+    @InjectRepository(HotelManager)
+    private hotelManagerRepository: Repository<HotelManager>,
+
+    @InjectRepository(Hotel)
+    private hotelRepository: Repository<Hotel>,
+
     private notificationService: NotificationService,
     private factureService: FactureService,
   ) {}
+// ===== CREATE ===== //
+async create(dto: CreateReservationDto, clientId: number): Promise<Reservation> {
 
-  // ===== CREATE =====
-  async create(dto: CreateReservationDto): Promise<Reservation> {
+  // Récupérer l'hotel avec son hotelManager
+  const hotel = await this.hotelRepository.findOne({ 
+    where: { idhotel: dto.idhotel }, 
+    relations: ['hotelManager'] 
+  });
 
-    const reservation = this.reservationRepository.create({
-      date_debut: dto.date_debut,
-      date_fin: dto.date_fin,
-      statut: 'en attente',
+  const reservation = this.reservationRepository.create({
+    date_debut: dto.date_debut,
+    date_fin: dto.date_fin,
+    statut: 'en attente',
+    montant: dto.montant,
 
-      chambres: [{ idchambre: dto.chambreId }] as any,
-      hotelManager: { iduser: dto.hotelId } as any,
-    });
+    client: { iduser: clientId } as any,
+    hotel: { idhotel: dto.idhotel } as any,
+    hotelManager: hotel?.hotelManager,
+    chambres: [{ idchambre: dto.chambreId }] as any,
+  });
 
-    return this.reservationRepository.save(reservation);
-  }
-
+  return this.reservationRepository.save(reservation);
+}
   // ===== CONFIRMER =====
   async confirmerReservation(id: number, clientId: number): Promise<void> {
 
     const reservation = await this.reservationRepository.findOne({
       where: { idreservation: id },
-      relations: ['client','chambres','hotelManager'],
+    relations: ['client','chambres','hotelManager','hotel'],
     });
 
     if (!reservation) throw new NotFoundException('Réservation non trouvée');
@@ -110,22 +131,26 @@ export class ReservationService {
 
     if (role === 'admin') {
       return this.reservationRepository.find({
-        relations: ['client','hotelManager','chambres','facture'],
+        relations: ['client','hotelManager','chambres','facture','hotel'],
       });
     }
 
     if (role === 'client') {
       return this.reservationRepository.find({
         where: { client: { iduser: userId } },
-        relations: ['client','hotelManager','chambres','facture'],
+      relations: ['client','hotelManager','chambres','facture','hotel'],
       });
     }
 
     if (role === 'hotel-manager') {
-      return this.reservationRepository.find({
-        where: { hotelManager: { iduser: userId } },
-        relations: ['client','hotelManager','chambres','facture'],
-      });
+      return this.reservationRepository.createQueryBuilder('reservation')
+        .leftJoinAndSelect('reservation.client', 'client')
+        .leftJoinAndSelect('reservation.hotelManager', 'hotelManager')
+        .leftJoinAndSelect('reservation.chambres', 'chambres')
+        .leftJoinAndSelect('reservation.facture', 'facture')
+        .leftJoinAndSelect('reservation.hotel', 'hotel')
+        .where('hotelManager.iduser = :userId', { userId })
+        .getMany();
     }
 
     return [];
@@ -136,7 +161,7 @@ export class ReservationService {
 
     const reservation = await this.reservationRepository.findOne({
       where: { idreservation: id },
-      relations: ['client','hotelManager','chambres','facture'],
+      relations: ['client','hotelManager','chambres','facture','hotel'],
     });
 
     if (!reservation) throw new NotFoundException('Réservation non trouvée');

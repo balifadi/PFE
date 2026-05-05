@@ -21,9 +21,18 @@ export class ChambreService {
   async create(dto: CreateChambreDto, user: any): Promise<Chambre> {
 
     if (user.role === 'admin') {
+      // Récupérer l'hôtel pour récupérer son manager automatiquement
+      const hotel = await this.chambreRepository.manager
+        .getRepository('Hotel')
+        .findOne({
+          where: { idhotel: dto.hotelId },
+          relations: ['hotelManager']
+        });
+
       const chambre = this.chambreRepository.create({
         ...dto,
         hotel: { idhotel: dto.hotelId },
+        hotelManager: hotel?.hotelManager,
       });
       return this.chambreRepository.save(chambre);
     }
@@ -50,10 +59,12 @@ export class ChambreService {
     }
 
     if (role === 'hotel-manager') {
-      return this.chambreRepository.find({
-        where: { hotelManager: { iduser: userId } },
-        relations: ['hotelManager', 'hotel', 'reservation'],
-      });
+      return this.chambreRepository.createQueryBuilder('chambre')
+        .leftJoinAndSelect('chambre.hotelManager', 'hotelManager')
+        .leftJoinAndSelect('chambre.hotel', 'hotel')
+        .leftJoinAndSelect('chambre.reservation', 'reservation')
+        .where('hotelManager.iduser = :userId', { userId })
+        .getMany();
     }
 
     // client + agence-manager
