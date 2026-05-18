@@ -63,7 +63,12 @@ export class AdminService {
       hotels: await this.hotelRepository.count(),
       agences: await this.agenceRepository.count(),
       reservations: await this.reservationRepository.count(),
-      facturesPayees: await this.factureRepository.count({ where: { statut: 'payée' } }),
+      facturesPayees: await this.factureRepository.count({
+        where: [
+          { statut: 'payee' },
+          { statut: 'payée' },
+        ],
+      }),
       zones: await this.zoneRepository.count(),
       notifications: await this.notificationRepository.count(),
       avis: await this.avisRepository.count(),

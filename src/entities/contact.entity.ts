@@ -1,9 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
 import { Client } from './client.entity';
 
 @Entity()
 export class Contact {
-
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -22,8 +21,15 @@ export class Contact {
   @Column('text')
   message: string;
 
-  @ManyToOne(() => Client, (client) => client.contacts, {
-    onDelete: 'CASCADE'
-  })
+  @Column({ type: 'text', nullable: true })
+  adminReply: string;
+
+  @Column({ default: false })
+  isReplied: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @ManyToOne(() => Client, { nullable: true, onDelete: 'SET NULL' })
   client: Client;
 }

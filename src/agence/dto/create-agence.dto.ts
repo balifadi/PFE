@@ -22,6 +22,11 @@ export class CreateAgenceDto {
   @IsNumber()
   nb_voitures: number;
 
+  @ApiPropertyOptional({ example: 'https://images.unsplash.com/...', description: 'Image principale de l’agence' })
+  @IsOptional()
+  @IsString()
+  imagePath?: string;
+
   @ApiProperty({ example: 36.8065 })
   @IsNumber()
   latitude: number;

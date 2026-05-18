@@ -10,6 +10,8 @@ import {
   UseGuards,
   Request,
   Query,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
 
 import { HotelService } from './hotel.service';
@@ -27,7 +29,11 @@ import {
   ApiOperation,
   ApiBody,
   ApiParam,
+  ApiConsumes,
 } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 
 @ApiTags('Hotels')
 @Controller('hotels')
@@ -36,6 +42,28 @@ import {
 export class HotelController {
 
   constructor(private readonly hotelService: HotelService) {}
+
+  // ================= UPLOAD IMAGES =================
+  @Post('upload-images')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Téléverser des images d’hôtel' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FilesInterceptor('files', 10, {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1e9) + extname(file.originalname);
+          cb(null, uniqueName);
+        },
+      }),
+    }),
+  )
+  uploadImages(@UploadedFiles() files: Express.Multer.File[]) {
+    return {
+      images: (files || []).map((file) => `http://localhost:3000/uploads/${file.filename}`),
+    };
+  }
 
   // ================= CREATE =================
   @Post()

@@ -1,7 +1,8 @@
 import {
   Injectable,
   NotFoundException,
-  ForbiddenException
+  ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,6 +12,7 @@ import { Location } from '../entities/location.entity';
 import { NotificationService } from '../notification/notification.service';
 import { FactureService } from '../facture/facture.service';
 import { Agence } from '../entities/agence.entity';
+import { Voiture } from '../entities/voiture.entity';
 
 import { CreateLocationDto } from './dto/create-location.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
@@ -21,6 +23,10 @@ export class LocationService {
   constructor(
     @InjectRepository(Location)
     private locationRepository: Repository<Location>,
+
+    @InjectRepository(Voiture)
+    private voitureRepository: Repository<Voiture>,
+
     private notificationService: NotificationService,
     private factureService: FactureService,
   ) {}
@@ -35,6 +41,28 @@ export class LocationService {
       relations: ['agenceManager'] 
     });
 
+   if (!agence) {
+     throw new NotFoundException('Agence non trouvée');
+   }
+
+   const voiture = await this.voitureRepository.findOne({
+     where: { idvoiture: dto.voitureId },
+     relations: ['agence'],
+   });
+
+   if (!voiture) {
+     throw new NotFoundException('Voiture non trouvée');
+   }
+
+   if (voiture.agence?.idagence !== agence.idagence) {
+     throw new BadRequestException('La voiture sélectionnée ne dépend pas de cette agence');
+   }
+
+   const voitureStatus = String(voiture.etat ?? 'disponible').toLowerCase();
+   if (voitureStatus !== 'disponible' && voitureStatus !== 'active') {
+     throw new BadRequestException('La voiture sélectionnée est indisponible');
+   }
+
    const location = this.locationRepository.create({
      date_debut: dto.date_debut,
      date_fin: dto.date_fin,
@@ -47,7 +75,14 @@ export class LocationService {
      agenceManager: agence?.agenceManager,
    });
 
-   return this.locationRepository.save(location);
+   const savedLocation = await this.locationRepository.save(location);
+
+   voiture.etat = 'louée';
+   await this.voitureRepository.save(voiture);
+
+   await this.factureService.createFacture(undefined, savedLocation.idlocation);
+
+   return this.findOne(savedLocation.idlocation, clientId, 'client');
  }
   // ===== CONFIRMER =====
   async confirmerLocation(id: number, clientId: number): Promise<void> {
@@ -61,6 +96,11 @@ export class LocationService {
 
     location.statut = 'confirmée';
     await this.locationRepository.save(location);
+
+    if (location.voiture) {
+      location.voiture.etat = 'louée';
+      await this.voitureRepository.save(location.voiture);
+    }
 
     await this.factureService.createFacture(undefined, location.idlocation);
 
@@ -76,7 +116,20 @@ export class LocationService {
   // ===== ANNULER =====
   async annulerLocation(id: number, clientId: number): Promise<void> {
 
-    await this.locationRepository.update(id, { statut: 'annulée' });
+    const location = await this.locationRepository.findOne({
+      where: { idlocation: id },
+      relations: ['voiture'],
+    });
+
+    if (!location) throw new NotFoundException('Location non trouvée');
+
+    location.statut = 'annulée';
+    await this.locationRepository.save(location);
+
+    if (location.voiture) {
+      location.voiture.etat = 'disponible';
+      await this.voitureRepository.save(location.voiture);
+    }
 
     await this.notificationService.create({
       clientId,

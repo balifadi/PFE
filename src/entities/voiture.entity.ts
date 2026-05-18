@@ -23,6 +23,9 @@ export class Voiture {
 
   @Column({ type: 'decimal' })
   prix_Jour: number;
+
+  @Column({ nullable: true })
+  imagePath: string;
   
   @ManyToOne(() => AgenceManager, (manager) => manager.voitures)
   agenceManager: AgenceManager;

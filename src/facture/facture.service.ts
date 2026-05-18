@@ -1,6 +1,7 @@
 
 import {
   Injectable,
+  BadRequestException,
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
@@ -66,6 +67,12 @@ export class FactureService {
   // 🔵 CREATE AUTO FACTURE
   // =====================================================
   async createFacture(reservationId?: number, locationId?: number): Promise<Facture> {
+    if (!reservationId && !locationId) {
+      throw new BadRequestException(
+        'Une réservation ou une location est requise pour générer une facture',
+      );
+    }
+
     const reservation = reservationId
       ? await this.getReservation(reservationId)
       : undefined;
@@ -73,6 +80,24 @@ export class FactureService {
     const location = locationId
       ? await this.getLocation(locationId)
       : undefined;
+
+    const existingFacture = reservationId
+      ? await this.factureRepository.findOne({
+          where: {
+            reservation: { idreservation: reservationId },
+          },
+          relations: ['client', 'reservation', 'location'],
+        })
+      : await this.factureRepository.findOne({
+          where: {
+            location: { idlocation: locationId! },
+          },
+          relations: ['client', 'reservation', 'location'],
+        });
+
+    if (existingFacture) {
+      return existingFacture;
+    }
 
     const client = reservation?.client || location?.client;
 
@@ -273,6 +298,23 @@ export class FactureService {
 
     // ✅ Montant total = somme des montants de réservation et location
     return montantReservation + montantLocation;
+  }
+
+  // =====================================================
+  // 🔵 REMOVE (Admin only)
+  // =====================================================
+  async remove(id: number): Promise<{ message: string }> {
+    const facture = await this.factureRepository.findOne({
+      where: { idfacture: id },
+    });
+
+    if (!facture) {
+      throw new NotFoundException('Facture introuvable');
+    }
+
+    await this.factureRepository.remove(facture);
+
+    return { message: `Facture #${id} supprimée avec succès` };
   }
 
   // =====================================================

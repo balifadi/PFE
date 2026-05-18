@@ -94,6 +94,28 @@ export class ZoneController {
     return this.zoneService.getLocalisationPublic();
   }
 
+  // ================= UPLOAD IMAGE =================
+  @Post('upload-image')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Téléverser une image de zone' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const uniqueName = Date.now() + extname(file.originalname);
+          cb(null, uniqueName);
+        },
+      }),
+    }),
+  )
+  uploadImage(@UploadedFile() file: Express.Multer.File) {
+    return {
+      image: file ? `http://localhost:3000/uploads/${file.filename}` : null,
+    };
+  }
+
   // ================= FIND ONE =================
   @Get(':id')
   @Roles('admin', 'client')

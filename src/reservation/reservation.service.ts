@@ -2,7 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-  BadRequestException,   // ✅ AJOUT
+  BadRequestException,
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,6 +12,7 @@ import { Reservation } from '../entities/reservation.entity';
 import { Client } from '../entities/client.entity';
 import { HotelManager } from '../entities/hotel-manager.entity';
 import { Hotel } from '../entities/hotel.entity';
+import { Chambre } from '../entities/chambre.entity';
 import { NotificationService } from '../notification/notification.service';
 import { FactureService } from '../facture/facture.service';
 
@@ -34,6 +35,9 @@ export class ReservationService {
     @InjectRepository(Hotel)
     private hotelRepository: Repository<Hotel>,
 
+    @InjectRepository(Chambre)
+    private chambreRepository: Repository<Chambre>,
+
     private notificationService: NotificationService,
     private factureService: FactureService,
   ) {}
@@ -46,6 +50,28 @@ async create(dto: CreateReservationDto, clientId: number): Promise<Reservation> 
     relations: ['hotelManager'] 
   });
 
+  if (!hotel) {
+    throw new NotFoundException('Hotel non trouvé');
+  }
+
+  const chambre = await this.chambreRepository.findOne({
+    where: { idchambre: dto.chambreId },
+    relations: ['hotel'],
+  });
+
+  if (!chambre) {
+    throw new NotFoundException('Chambre non trouvée');
+  }
+
+  if (chambre.hotel?.idhotel !== hotel.idhotel) {
+    throw new BadRequestException('La chambre sélectionnée ne dépend pas de cet hôtel');
+  }
+
+  const chambreStatus = String(chambre.etat ?? 'disponible').toLowerCase();
+  if (chambreStatus !== 'disponible' && chambreStatus !== 'active') {
+    throw new BadRequestException('La chambre sélectionnée est indisponible');
+  }
+
   const reservation = this.reservationRepository.create({
     date_debut: dto.date_debut,
     date_fin: dto.date_fin,
@@ -55,10 +81,17 @@ async create(dto: CreateReservationDto, clientId: number): Promise<Reservation> 
     client: { iduser: clientId } as any,
     hotel: { idhotel: dto.idhotel } as any,
     hotelManager: hotel?.hotelManager,
-    chambres: [{ idchambre: dto.chambreId }] as any,
   });
 
-  return this.reservationRepository.save(reservation);
+  const savedReservation = await this.reservationRepository.save(reservation);
+
+  chambre.reservation = savedReservation;
+  chambre.etat = 'occupee';
+  await this.chambreRepository.save(chambre);
+
+  await this.factureService.createFacture(savedReservation.idreservation, undefined);
+
+  return this.findOne(savedReservation.idreservation, clientId, 'client');
 }
   // ===== CONFIRMER =====
   async confirmerReservation(id: number, clientId: number): Promise<void> {
@@ -72,6 +105,12 @@ async create(dto: CreateReservationDto, clientId: number): Promise<Reservation> 
 
     reservation.statut = 'confirmée';
     await this.reservationRepository.save(reservation);
+
+    for (const chambre of reservation.chambres ?? []) {
+      chambre.etat = 'occupee';
+      chambre.reservation = reservation;
+      await this.chambreRepository.save(chambre);
+    }
 
     await this.factureService.createFacture(reservation.idreservation, undefined);
 
@@ -87,7 +126,23 @@ async create(dto: CreateReservationDto, clientId: number): Promise<Reservation> 
   // ===== ANNULER =====
   async annulerReservation(id: number, clientId: number): Promise<void> {
 
-    await this.reservationRepository.update(id, { statut: 'annulée' });
+    const reservation = await this.reservationRepository.findOne({
+      where: { idreservation: id },
+      relations: ['chambres'],
+    });
+
+    if (!reservation) throw new NotFoundException('Réservation non trouvée');
+
+    reservation.statut = 'annulée';
+    await this.reservationRepository.save(reservation);
+
+    for (const chambre of reservation.chambres ?? []) {
+      if ((chambre.etat || '').toLowerCase() !== 'maintenance') {
+        chambre.etat = 'disponible';
+      }
+      chambre.reservation = null as any;
+      await this.chambreRepository.save(chambre);
+    }
 
     await this.notificationService.create({
       clientId,

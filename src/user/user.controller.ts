@@ -8,6 +8,9 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import { VerifyPasswordResetOtpDto } from './dto/verify-password-reset-otp.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 import { ApiTags, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -42,6 +45,31 @@ export class UserController {
   @UsePipes(new ValidationPipe({ whitelist: true }))
   async login(@Body() loginUserDto: LoginUserDto): Promise<LoginResponseDto> {
     return this.userService.login(loginUserDto);
+  }
+
+  // ================= PASSWORD RESET =================
+  @Post('password/forgot')
+  @ApiBody({ type: RequestPasswordResetDto })
+  @ApiResponse({ status: 200, description: 'OTP envoyé' })
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.userService.requestPasswordReset(dto.email);
+  }
+
+  @Post('password/verify-otp')
+  @ApiBody({ type: VerifyPasswordResetOtpDto })
+  @ApiResponse({ status: 200, description: 'OTP vérifié' })
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  verifyPasswordResetOtp(@Body() dto: VerifyPasswordResetOtpDto) {
+    return this.userService.verifyPasswordResetOtp(dto.email, dto.otp);
+  }
+
+  @Post('password/reset')
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiResponse({ status: 200, description: 'Mot de passe réinitialisé' })
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.userService.resetPassword(dto.email, dto.otp, dto.password);
   }
 
   // ================= PROFILE =================

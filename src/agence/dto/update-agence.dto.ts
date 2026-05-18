@@ -32,4 +32,9 @@ export class UpdateAgenceDto {
   @IsOptional()
   @IsNumber()
   nb_voitures?: number;
+
+  @ApiPropertyOptional({ example: 'https://images.unsplash.com/...' })
+  @IsOptional()
+  @IsString()
+  imagePath?: string;
 }

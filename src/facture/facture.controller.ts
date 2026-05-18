@@ -4,6 +4,7 @@ import {
   Post,
   Patch,
   Put,
+  Delete,
   Body,
   Param,
   Query,
@@ -103,6 +104,18 @@ export class FactureController {
   @ApiOperation({ summary: 'Lister toutes les factures' })
   findAll(@Request() req: any) {
     return this.factureService.findAll(req.user.iduser, req.user.role);
+  }
+
+  // =====================================================
+  // 🔵 DELETE (Admin only)
+  // =====================================================
+  @Delete(':id')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Supprimer une facture (Admin uniquement)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiResponse({ status: 200, description: 'Facture supprimée avec succès' })
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.factureService.remove(id);
   }
 
   // =====================================================

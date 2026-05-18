@@ -19,6 +19,11 @@ import { HotelFilterDto } from './dto/hotel-filter.dto';
 
 @Injectable()
 export class HotelService {
+  private readonly defaultHotelImages = [
+    'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&w=1200&q=80',
+  ];
 
   constructor(
     @InjectRepository(Hotel)
@@ -34,6 +39,54 @@ export class HotelService {
     private chambreService: ChambreService,
   ) {}
 
+  private extractImageCandidate(dto: Record<string, any>): string | undefined {
+    const candidates = [
+      dto?.imagePath,
+      dto?.image,
+      ...(Array.isArray(dto?.images) ? dto.images : []),
+    ];
+
+    const selected = candidates.find((value) => typeof value === 'string' && value.trim().length > 0);
+    return selected ? String(selected).trim() : undefined;
+  }
+
+  private resolveImagePath(imagePath: string | undefined, fallback: string): string {
+    if (!imagePath) {
+      return fallback;
+    }
+
+    const value = String(imagePath).trim();
+
+    if (!value) {
+      return fallback;
+    }
+
+    if (
+      value.startsWith('http://') ||
+      value.startsWith('https://') ||
+      value.startsWith('data:') ||
+      value.startsWith('assets/')
+    ) {
+      return value;
+    }
+
+    if (value.startsWith('/')) {
+      return `http://localhost:3000${value}`;
+    }
+
+    return `http://localhost:3000/uploads/${value}`;
+  }
+
+  private pickFallbackImage(seed: string, list: string[]): string {
+    if (!list.length) {
+      return '';
+    }
+
+    const normalized = String(seed ?? '').trim();
+    const hash = normalized.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    return list[Math.abs(hash) % list.length];
+  }
+
   // ================= CREATE HOTEL =================
   async create(dto: CreateHotelDto, adminId: number): Promise<Hotel> {
 
@@ -45,6 +98,10 @@ export class HotelService {
 
     const hotel = this.hotelRepository.create({
       ...dto,
+      imagePath: this.resolveImagePath(
+        this.extractImageCandidate(dto as Record<string, any>),
+        this.pickFallbackImage(`${dto.nom}-${dto.ville}`, this.defaultHotelImages),
+      ),
       admin,
       hotelManager: dto.hotelManagerId ? { iduser: dto.hotelManagerId } : undefined,
     });
@@ -218,9 +275,18 @@ export class HotelService {
 
     const payload: Record<string, any> = {};
     for (const [key, value] of Object.entries(dto as any)) {
-      if (value === undefined) continue;
+      if (value === undefined || value === null) continue;
+      if (typeof value === 'string' && !value.trim()) continue;
       const realKey = mapping[normalize(key)];
       if (realKey) payload[realKey] = value;
+    }
+
+    const imageCandidate = this.extractImageCandidate(dto as Record<string, any>);
+    if (imageCandidate) {
+      payload.imagePath = this.resolveImagePath(
+        imageCandidate,
+        this.defaultHotelImages[0],
+      );
     }
 
     if (Object.keys(payload).length > 0) {

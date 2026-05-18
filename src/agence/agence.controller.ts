@@ -10,6 +10,8 @@ import {
   UseGuards,
   Request,
   Query,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
 
 import { AgenceService } from './agence.service';
@@ -27,7 +29,11 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBody,
+  ApiConsumes,
 } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 
 @ApiTags('Agences')
 @Controller('agences')
@@ -35,6 +41,28 @@ import {
 @ApiBearerAuth()
 export class AgenceController {
   constructor(private readonly agenceService: AgenceService) {}
+
+  // ================= UPLOAD IMAGES =================
+  @Post('upload-images')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Téléverser des images d’agence' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FilesInterceptor('files', 10, {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1e9) + extname(file.originalname);
+          cb(null, uniqueName);
+        },
+      }),
+    }),
+  )
+  uploadImages(@UploadedFiles() files: Express.Multer.File[]) {
+    return {
+      images: (files || []).map((file) => `http://localhost:3000/uploads/${file.filename}`),
+    };
+  }
 
   // ================= CREATE =================
   @Post()

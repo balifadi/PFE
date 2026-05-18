@@ -13,4 +13,9 @@ export class UpdateVoitureDto {
   @IsOptional()
   @Min(0)
   prix_Jour?: number;
+
+  @ApiPropertyOptional({ example: 'https://images.unsplash.com/...' })
+  @IsString()
+  @IsOptional()
+  imagePath?: string;
 }

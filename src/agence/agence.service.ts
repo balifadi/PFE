@@ -18,6 +18,12 @@ import { AgenceFilterDto } from './dto/agence-filter.dto';
 
 @Injectable()
 export class AgenceService {
+  private readonly defaultAgencyImages = [
+    'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&w=1200&q=80',
+  ];
+
   constructor(
     @InjectRepository(Agence)
     private agenceRepository: Repository<Agence>,
@@ -32,6 +38,54 @@ export class AgenceService {
     private voitureService: VoitureService,
   ) {}
 
+  private extractImageCandidate(dto: Record<string, any>): string | undefined {
+    const candidates = [
+      dto?.imagePath,
+      dto?.image,
+      ...(Array.isArray(dto?.images) ? dto.images : []),
+    ];
+
+    const selected = candidates.find((value) => typeof value === 'string' && value.trim().length > 0);
+    return selected ? String(selected).trim() : undefined;
+  }
+
+  private resolveImagePath(imagePath: string | undefined, fallback: string): string {
+    if (!imagePath) {
+      return fallback;
+    }
+
+    const value = String(imagePath).trim();
+
+    if (!value) {
+      return fallback;
+    }
+
+    if (
+      value.startsWith('http://') ||
+      value.startsWith('https://') ||
+      value.startsWith('data:') ||
+      value.startsWith('assets/')
+    ) {
+      return value;
+    }
+
+    if (value.startsWith('/')) {
+      return `http://localhost:3000${value}`;
+    }
+
+    return `http://localhost:3000/uploads/${value}`;
+  }
+
+  private pickFallbackImage(seed: string, list: string[]): string {
+    if (!list.length) {
+      return '';
+    }
+
+    const normalized = String(seed ?? '').trim();
+    const hash = normalized.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    return list[Math.abs(hash) % list.length];
+  }
+
   // ================= CREATE =================
   async create(dto: CreateAgenceDto, adminId: number): Promise<Agence> {
     const admin = await this.adminRepository.findOne({
@@ -42,6 +96,10 @@ export class AgenceService {
 
     const agence = this.agenceRepository.create({
       ...dto,
+      imagePath: this.resolveImagePath(
+        this.extractImageCandidate(dto as Record<string, any>),
+        this.pickFallbackImage(`${dto.nom}-${dto.ville}`, this.defaultAgencyImages),
+      ),
       admin,
       agenceManager: dto.agenceManagerId ? { iduser: dto.agenceManagerId } : undefined,
     });
@@ -208,9 +266,15 @@ export class AgenceService {
 
     const payload: Record<string, any> = {};
     for (const [key, value] of Object.entries(dto as any)) {
-      if (value === undefined) continue;
+      if (value === undefined || value === null) continue;
+      if (typeof value === 'string' && !value.trim()) continue;
       const realKey = mapping[normalize(key)];
       if (realKey) payload[realKey] = value;
+    }
+
+    const imageCandidate = this.extractImageCandidate(dto as Record<string, any>);
+    if (imageCandidate) {
+      payload.imagePath = this.resolveImagePath(imageCandidate, this.defaultAgencyImages[0]);
     }
 
     if (Object.keys(payload).length > 0) {

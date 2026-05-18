@@ -40,6 +40,7 @@ import { AvisModule } from './avis/avis.module';
 import { NotificationModule } from './notification/notification.module';
 import { FavorisModule } from './favoris/favoris.module';
 import { ContactModule } from './contact/contact.module';
+import { CatalogModule } from './catalog/catalog.module';
 
 @Module({
   imports: [
@@ -94,6 +95,7 @@ import { ContactModule } from './contact/contact.module';
     NotificationModule,
     FavorisModule,
     ContactModule,
+    CatalogModule,
   ],
   controllers: [],
   providers: [],

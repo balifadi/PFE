@@ -21,6 +21,9 @@ export class Agence {
   @Column({ default: 0 })
   nb_voitures: number;
 
+  @Column({ nullable: true })
+  imagePath: string;
+
   @Column({ type: 'decimal' })
   latitude: number;
 

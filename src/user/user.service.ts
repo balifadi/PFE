@@ -17,6 +17,12 @@ import { LoginResponseDto } from './dto/login-response.dto';
 export class UserService {
 
   private allowedRoles = ['admin', 'client', 'hotel-manager', 'agence-manager'];
+  private readonly resetOtp = '123456';
+  private readonly resetSessionTtlMs = 15 * 60 * 1000;
+  private readonly passwordResetSessions = new Map<
+    string,
+    { otp: string; expiresAt: number; verified: boolean }
+  >();
 
   constructor(
     @InjectRepository(User)
@@ -108,6 +114,99 @@ export class UserService {
       email: user.email,
       telephone: (user as any).telephone,
       role: user.role as any,
+    };
+  }
+
+  // ================= PASSWORD RECOVERY =================
+  private getResetSessionKey(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private createResetSession(email: string) {
+    const key = this.getResetSessionKey(email);
+    const session = {
+      otp: this.resetOtp,
+      expiresAt: Date.now() + this.resetSessionTtlMs,
+      verified: false,
+    };
+
+    this.passwordResetSessions.set(key, session);
+    return session;
+  }
+
+  private getResetSession(email: string) {
+    const key = this.getResetSessionKey(email);
+    const session = this.passwordResetSessions.get(key);
+
+    if (!session) {
+      throw new NotFoundException('Aucune demande de réinitialisation trouvée');
+    }
+
+    if (Date.now() > session.expiresAt) {
+      this.passwordResetSessions.delete(key);
+      throw new UnauthorizedException('Code OTP expiré');
+    }
+
+    return session;
+  }
+
+  async requestPasswordReset(email: string) {
+    const user = await this.userRepository.findOne({ where: { email } });
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    this.createResetSession(email);
+
+    console.log(
+      `[PasswordReset] OTP ${this.resetOtp} sent to ${user.email} (static dev code)`
+    );
+
+    return {
+      message: 'Un code OTP a été envoyé à votre adresse email.',
+      email: user.email,
+      otp: this.resetOtp,
+    };
+  }
+
+  async verifyPasswordResetOtp(email: string, otp: string) {
+    const session = this.getResetSession(email);
+
+    if (session.otp !== otp) {
+      throw new UnauthorizedException('Code OTP invalide');
+    }
+
+    session.verified = true;
+    this.passwordResetSessions.set(this.getResetSessionKey(email), session);
+
+    return {
+      message: 'Code OTP vérifié avec succès.',
+    };
+  }
+
+  async resetPassword(email: string, otp: string, password: string) {
+    const session = this.getResetSession(email);
+
+    if (session.otp !== otp || !session.verified) {
+      throw new UnauthorizedException('Code OTP invalide');
+    }
+
+    const user = await this.userRepository.findOne({ where: { email } });
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await this.userRepository.update(user.iduser, {
+      password: hashedPassword,
+    });
+
+    this.passwordResetSessions.delete(this.getResetSessionKey(email));
+
+    return {
+      message: 'Mot de passe réinitialisé avec succès.',
     };
   }
 
